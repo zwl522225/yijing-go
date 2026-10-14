@@ -332,6 +332,26 @@ button:focus-visible, a:focus-visible {
 .score-summary small { grid-column: 2; color: #786f62; font-size: 9px; }
 .score-dot { grid-row: 1 / 3; width: 22px; aspect-ratio: 1; border-radius: 50%; }
 .score-dot.black { background: #17221b; }.score-dot.white { border: 1px solid #aaa293; background: #fffaf1; }
+.scoring-steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.scoring-steps li { flex: 1; padding: 8px 4px; border-radius: 7px; background: #e8dfd0; text-align: center; font-size: 12px; color: #655b4f; }
+.scoring-steps [aria-current="step"] { background: #dce7d8; color: #294431; font-weight: 700; box-shadow: inset 0 0 0 1px #7a9275; }
+.score-explanation { padding: 10px 12px; border: 1px solid #cfbea4; border-radius: 9px; font-size: 12px; line-height: 1.7; }
+.score-explanation p { margin: 3px 0; }
+.pass-explanation { margin: 10px 0 0; color: #665e52; font-size: 12px; line-height: 1.7; }
+.site-footer { flex-wrap: wrap; }
+.site-footer .feedback-entry { margin-left: auto; }
+.feedback-entry { min-height: 36px; }
+.feedback-dialog { z-index: 60; width: calc(100% - 32px); max-width: 560px !important; max-height: calc(100dvh - 32px); overflow-y: auto; border-color: #b9a78e; background: #f7efe2; color: #302e28; }
+.feedback-dialog [data-slot="dialog-header"] { padding-right: 20px; }
+.feedback-close-icon { position: absolute; right: 8px; top: 8px; width: 36px; height: 36px; font-size: 24px; cursor: pointer; }
+.feedback-field { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
+.feedback-field select, .feedback-field textarea { min-width: 0; width: 100%; border: 1px solid #b8aa93; border-radius: 7px; padding: 8px; background: #fffaf1; color: #302e28; font-size: 14px; font-weight: 400; }
+.feedback-field textarea { resize: vertical; line-height: 1.6; }
+.feedback-field :focus-visible, .feedback-close-icon:focus-visible { outline: 2px solid #496c4d; outline-offset: 2px; }
+.feedback-count, .feedback-status { margin: 0; font-size: 12px; line-height: 1.6; }
+.feedback-count { color: #665e52; }
+.feedback-status { min-height: 20px; }
+.feedback-external { color: #31563a; text-decoration: underline; font-size: 13px; }
 
 @keyframes hint-pulse { 50% { transform: scale(1.12); box-shadow: 0 0 0 7px rgba(255,247,218,.32); } }
 @keyframes wave-breathe { to { transform: scaleY(.45); opacity: .4; } }
@@ -413,17 +433,6 @@ button:focus-visible, a:focus-visible {
 .academy-task .demo-action, .academy-task .demo-state { font-size: 13px; margin: 6px 0; }
 .demo-controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
 .lesson-demo small { display: block; margin-top: 6px; color: #555a4d; text-align: center; }
-@media (max-width: 640px) {
-  .academy-layout { display: grid; grid-template-columns: minmax(0,1fr); grid-template-areas: "tabs" "task" "board" "roadmap" "music"; }
-  .academy-layout .game-sidebar, .academy-layout .mode-tabs, .academy-layout [data-slot="tabs-content"] { display: contents; }
-  .academy-layout .mode-tabs-list { grid-area: tabs; }
-  .academy-layout .academy-task { grid-area: task; margin-bottom: 0; }
-  .academy-layout .board-stage { grid-area: board; position: static; }
-  .academy-layout .learning-roadmap { grid-area: roadmap; }
-  .academy-layout .music-card { grid-area: music; }
-  .academy-task .lesson-actions button { padding: 8px 5px; font-size: 13px; }
-  .board-footer .lesson-prompt { letter-spacing: 0; line-height: 1.6; font-size: 12px; }
-}
 
 /* Glossary shares the academy controls and remains usable in narrow dialogs. */
 .term-links { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -482,3 +491,66 @@ button:focus-visible, a:focus-visible {
 .review-entry { align-self: start; }
 .practice-dialog .practice-board { max-width: 340px; }
 @media (max-width: 600px) { .header-stats { flex-wrap: wrap; } .review-controls button { flex: 1 1 40%; } .practice-topics button { font-size: 12px; padding: 7px 9px; } }
+
+/* The current task leads to the board; lesson detail stays beside it on desktop. */
+.game-shell { grid-template-areas: "board tabs" "board guide" "board task" "board settings" "board sidebar"; grid-template-rows: repeat(4, auto) 1fr; align-items: start; }
+.game-shell > .board-stage { grid-area: board; }
+.game-shell > .mode-tabs { grid-area: tabs; }
+.game-shell > .beginner-guide { grid-area: guide; }
+.game-shell > .academy-task { grid-area: task; margin-bottom: 0; }
+.game-shell > .board-settings { grid-area: settings; }
+.game-shell > .game-sidebar { grid-area: sidebar; }
+.mode-tabs-list { display: flex; width: 100%; padding: 4px; border-radius: 12px; background: #e8dece; }
+.mode-tabs-list button { flex: 1; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.mode-tabs-list button[aria-pressed=true] { color: #fffaf1; background: #466148; }
+.beginner-guide-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.beginner-guide-content h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.beginner-guide-content p { margin: 8px 0; font-size: 14px; line-height: 1.6; }
+.board-settings { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; min-width: 0; }
+.board-settings .move-confirm-panel { flex: 1 1 180px; padding: 10px 12px; }
+.board-settings .learning-assists { flex: 1 1 130px; padding: 10px 12px; }
+.academy-task .lesson-heading { display: block; }
+.academy-task .lesson-heading h2 { margin: 2px 0 6px; font-size: 19px; }
+.academy-task .lesson-objective { display: block; }
+.academy-task .exercise-heading h3 { margin: 6px 0 2px; }
+.academy-task .exercise-prompt { margin: 6px 0; }
+.academy-task .exercise-prompt + p { margin: 4px 0 8px; font-size: 13px; line-height: 1.5; }
+.academy-details > summary { color: #344c39; font-size: 14px; font-weight: 700; cursor: pointer; }
+.academy-details p { margin: 8px 0; color: #4c493f; font-size: 14px; line-height: 1.7; }
+.academy-details h3 { font-size: 15px; font-weight: 700; }
+.academy-details button { min-height: 42px; border: 1px solid #ad9878; border-radius: 9px; padding: 9px 12px; color: #343c30; background: #fffaf0; font-size: 14px; cursor: pointer; }
+.academy-details button:disabled { opacity: .58; cursor: default; }
+.academy-details .lesson-actions { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.lesson-feedback p { margin: 4px 0 0; }
+.coach-panel h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.coach-panel h3 { margin: 10px 0 4px; font-size: 14px; font-weight: 700; }
+.coach-panel p { margin: 4px 0; font-size: 13px; line-height: 1.7; }
+.coach-panel article + article { margin-top: 10px; border-top: 1px solid #d4c6af; padding-top: 4px; }
+.coach-panel .term-links { margin-top: 10px; }
+.attempted-point { position: absolute; z-index: 4; inset: 10%; display: grid; place-items: center; border: 2px dashed #803857; border-radius: 5px; color: #803857; background: rgba(255,246,242,.65); font-size: 24px; font-weight: 800; pointer-events: none; }
+@media (max-width: 940px) {
+  .game-shell { grid-template-areas: "tabs" "guide" "task" "board" "settings" "sidebar"; grid-template-rows: none; grid-template-columns: minmax(0,1fr); }
+  .academy-layout .board-stage { position: static; }
+  .game-sidebar { display: flex; }
+}
+@media (max-width: 580px) {
+  .academy-task { padding: 10px 12px; }
+  .academy-task .lesson-heading h2 { font-size: 17px; }
+  .academy-task .lesson-objective { font-size: 13px; line-height: 1.5; }
+  .academy-task .exercise-heading { font-size: 12px; }
+  .academy-task .exercise-heading h3 { font-size: 13px; }
+  .academy-task .exercise-prompt { font-size: 14px; line-height: 1.5; }
+  .academy-task button { min-height: 36px; padding: 6px 10px; font-size: 13px; }
+  .academy-details .lesson-actions button { padding: 8px 5px; font-size: 13px; }
+  .beginner-guide-actions .dictionary-button { min-height: 32px; }
+  .board-footer .lesson-prompt { letter-spacing: 0; line-height: 1.6; font-size: 12px; }
+}
+
+@media (max-width: 580px) {
+  .academy-task progress { display: block; height: 5px; margin: 5px 0; }
+  .academy-layout .board-caption .eyebrow { display: none; }
+  .academy-layout .board-caption { padding-bottom: 8px; }
+}
+
+.lesson-story-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.lesson-story-row .lesson-guide { flex: 0 0 48px; }

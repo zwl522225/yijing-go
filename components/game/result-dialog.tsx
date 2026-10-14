@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type MouseEventHandler } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ type ResultDialogProps = {
   onConfirmScore(): void;
   onReturnAcademy(): void;
   onReview?(): void;
+  onFeedback?: MouseEventHandler<HTMLButtonElement>;
 };
 
 export function ResultDialog({
@@ -42,6 +43,7 @@ export function ResultDialog({
   onConfirmScore,
   onReturnAcademy,
   onReview,
+  onFeedback,
 }: ResultDialogProps) {
   const score = useMemo(
     () => scoreArea(state.board, deadStones, 7.5),
@@ -50,6 +52,19 @@ export function ResultDialog({
   const boardStyle = {
     "--board-size": state.size,
   } as React.CSSProperties;
+  let graduationStatus: string | null = null;
+  if (outcome) {
+    graduationStatus = `${graduated ? "历史毕业记录已保留 · " : ""}本局认输不授予毕业。`;
+  } else if (graduated) {
+    const currentRound = phase === "final"
+      ? "本局对局、死子确认与最终计分均已完成。"
+      : phase === "dead-stones"
+        ? "本局仍需确认死子，再核对并确认最终计分。"
+        : "本局仍需核对计分并确认最终计分。";
+    graduationStatus = `毕业已完成 · 历史毕业记录已保留。${currentRound}`;
+  } else if (phase === "final") {
+    graduationStatus = "本局已结束。毕业还需完成前置课程与完整的 9 路计分流程。";
+  }
 
   return (
     <Dialog open={open}>
@@ -64,6 +79,11 @@ export function ResultDialog({
 
         {!outcome ? (
           <>
+            <ol className="scoring-steps" aria-label="终局计分步骤">
+              <li data-step="dead-stones" aria-current={phase === "dead-stones" ? "step" : undefined}>1. 确认死子</li>
+              <li data-step="score-review" aria-current={phase === "score-review" ? "step" : undefined}>2. 核对计分</li>
+              <li data-step="final" aria-current={phase === "final" ? "step" : undefined}>3. 完成</li>
+            </ol>
             <div
               className="score-board"
               role="grid"
@@ -92,12 +112,19 @@ export function ResultDialog({
             </div>
             <div className="score-summary">
               <div><span className="score-dot black" /><strong>黑 {score.black.total}</strong><small>子 {score.black.stones} · 地 {score.black.territory}</small></div>
-              <div><span className="score-dot white" /><strong>白 {score.white.total}</strong><small>子 {score.white.stones} · 地 {score.white.territory} · 贴 7.5</small></div>
+              <div><span className="score-dot white" /><strong>白 {score.white.total}</strong><small>子 {score.white.stones} · 地 {score.white.territory} · 贴 {score.komi}</small></div>
             </div>
+            {phase !== "dead-stones" ? <div className="score-explanation">
+              <p>黑：子 {score.black.stones} + 地 {score.black.territory} = {score.black.total}</p>
+              <p>白：子 {score.white.stones} + 地 {score.white.territory} + 贴目 {score.komi} = {score.white.total}</p>
+              <p>中立空点 {score.neutral}：双方共享或不属于任何一方的空点，不计入双方面积。提掉的棋子不额外加分。</p>
+            </div> : null}
           </>
         ) : null}
 
-        {graduated ? <p role="status" className="graduation-status">毕业已完成 · 对局、死子确认与最终计分均已完成</p> : phase === "final" ? <p role="status">本局已结束。毕业还需完成前置课程与完整的 9 路计分流程。</p> : null}
+        {graduationStatus ? <p role="status" className={graduated ? "graduation-status" : undefined}>{graduationStatus}</p> : null}
+
+        {onFeedback ? <button type="button" className="dictionary-button feedback-entry" data-action="open-feedback" onClick={onFeedback}>遇到困难？反馈一下</button> : null}
 
         <DialogFooter>
           {phase === "dead-stones" && !outcome ? <Button data-action="confirm-dead" onClick={onConfirmDead}>确认死子</Button> : null}

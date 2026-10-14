@@ -106,10 +106,11 @@ export function ControlPanel({ game }: ControlPanelProps) {
                 <Flag />停一手
               </Button>
             </TooltipTrigger>
-            <TooltipContent>电脑会同意停着并进入数目</TooltipContent>
+            <TooltipContent>停一手会把回合交给对方。本游戏的入门电脑会跟随停一手，连续两次停一手进入计分。</TooltipContent>
           </Tooltip>
         </div>
       </TooltipProvider>
+      <p className="pass-explanation">停一手会把回合交给对方。本游戏的入门电脑会跟随停一手，连续两次停一手进入计分；棋盘不必填满。真实对局中，对方也可以继续落子。</p>
 
       <div className="control-secondary">
         <AlertDialog>

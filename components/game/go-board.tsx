@@ -21,6 +21,7 @@ type GoBoardProps = {
   isQuiz?: boolean;
   aiThinking: boolean;
   previewPoint?: Point|null;
+  attemptedPoint?: Point|null;
   readOnly?: boolean;
   onPlay(point: Point): void;
   onToggleDead(point: Point): void;
@@ -39,6 +40,7 @@ export function GoBoard({
   isQuiz = false,
   aiThinking,
   previewPoint = null,
+  attemptedPoint = null,
   readOnly = false,
   onPlay,
   onToggleDead,
@@ -125,6 +127,7 @@ export function GoBoard({
             const isLast = lastPoint?.x === x && lastPoint.y === y;
             const isDead = !isQuiz && deadStones.has(key);
             const isAtari = !isQuiz && assists.showAtari && atariKeys.has(key);
+            const attempted = !isQuiz && attemptedPoint?.x === x && attemptedPoint.y === y;
             const candidate = previewPoint?.x === x && previewPoint.y === y;
             const selected = selectedPoints.some(point => point.x === x && point.y === y);
             const group = groupAnchors.get(key);
@@ -138,9 +141,10 @@ export function GoBoard({
                 data-last={isLast || undefined}
                 data-selected={selected || undefined}
                 data-preview={candidate || undefined}
+                data-attempted={attempted || undefined}
                 key={key}
                 role="gridcell"
-                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}`}
+                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${attempted ? "，刚尝试的位置，棋盘未改变" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}`}
                 tabIndex={activeFocus.x === x && activeFocus.y === y ? 0 : -1}
                 type="button"
                 onFocus={() => setFocusPoint(point)}
@@ -151,6 +155,7 @@ export function GoBoard({
                   else onPlay(point);
                 }}
               >
+                {attempted ? <span className="attempted-point" aria-hidden="true">×</span> : null}
                 {stone ? (
                   <span className={`stone stone-${stone}${isDead ? " stone-dead" : ""}${isAtari ? " stone-atari" : ""}`}>
                     {isLast ? <i className="last-move-dot" /> : null}

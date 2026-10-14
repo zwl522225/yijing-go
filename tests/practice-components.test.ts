@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ExercisePractice, PracticePicker } from "@/components/learning/practice-picker";
+import { GLOSSARY_BY_ID } from "@/lib/learning/glossary";
 import { CURRICULUM } from "@/lib/learning/curriculum";
 import { createDefaultProgress } from "@/lib/learning/progress";
 import { LESSON_UNIT_IDS } from "@/lib/learning/types";
@@ -12,6 +13,18 @@ function elements(node:ReactNode):ReactElement<Record<string,unknown>>[]{if(Arra
 function click(tree:ReactNode,key:string,value:unknown){const button=elements(tree).find(e=>e.props[key]===value)!;expect(button).toBeDefined();(button.props.onClick as ()=>void)();}
 beforeEach(()=>{host.values=[];});
 describe("practice sandbox",()=>{
+  it("keeps a legal wrong attempt off the board and offers recovery without awarding completion in standalone and term practice",()=>{
+    const lesson=CURRICULUM.find(unit=>unit.id==="s1-intersections-turns")!;if(lesson.kind!=="lesson")throw new Error("lesson");
+    for(const exercise of [lesson.exercises[0],GLOSSARY_BY_ID.get("intersection")!.practice]) {
+      host.values=[];const complete=vi.fn();const view=()=>ExercisePractice({exercise,label:"练习",onComplete:complete,successLabel:"成功已重练"});
+      let tree=render(view);click(tree,"data-practice-point","0,0");tree=render(view);let text=renderToStaticMarkup(tree);
+      expect(text).toContain("这一手可以落");expect(text).toContain("练习棋盘保持原状");expect(text).toContain("下一步：");expect(text).not.toContain("mini-stone");
+      expect(text).toContain("查看提示（0/3）");expect(complete).not.toHaveBeenCalled();
+      click(tree,"data-action","retry");tree=render(view);text=renderToStaticMarkup(tree);expect(text).not.toContain("lesson-feedback");expect(text).not.toContain("mini-stone");
+      const expected=exercise.expected;if(expected.kind!=="move")throw new Error("move");click(tree,"data-practice-point",`${expected.point.x},${expected.point.y}`);tree=render(view);
+      expect(renderToStaticMarkup(tree)).toContain("成功已重练");expect(complete).toHaveBeenCalledOnce();
+    }
+  });
   it("replays and completes every curriculum action kind with hints and retry",()=>{
     const exercises=CURRICULUM.flatMap(unit=>unit.kind==="lesson"?unit.exercises:unit.kind==="quiz"?unit.questions:[]);
     for(const exercise of exercises){

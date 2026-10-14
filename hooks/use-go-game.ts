@@ -4,9 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { chooseMove, type Difficulty } from "@/lib/go/ai";
+import aiWorkerUrl from "../lib/go/ai.worker.ts?worker&url";
 import type { SoundscapeCategory } from "@/lib/audio/soundscapes";
 import { createGame, passTurn, playMove, undoRound } from "@/lib/go/rules";
 import { groupAt } from "@/lib/go/analysis";
+import { getCoachRound } from "@/lib/go/coach";
+import { isPointOnBoard } from "@/lib/learning/positions";
 import { describeMove } from "@/lib/go/explain";
 import { decodeSave, encodeSave, SAVE_KEY } from "@/lib/go/storage";
 import type { BoardSize, GameState, Move, MoveError, MoveResult, Point } from "@/lib/go/types";
@@ -51,7 +54,7 @@ async function workerMove(
   if (typeof Worker === "undefined") return chooseMove(state, "beginner");
 
   return new Promise((resolve) => {
-    const worker = new Worker(new URL("../lib/go/ai.worker.ts", import.meta.url), {
+    const worker = new Worker(aiWorkerUrl, {
       type: "module",
     });
     workerRef.current = worker;
@@ -82,6 +85,7 @@ async function workerMove(
 }
 
 export function useGoGame(audio: AudioPreferences) {
+  const [firstVisit, setFirstVisit] = useState(false);
   const [confirmMoves, setConfirmMovesState] = useState(false);
   const confirmMovesRef = useRef(false);
   type Preview = {point:Point;state:GameState;session:LearningSession|null;generation:number;mode:GameMode};
@@ -205,8 +209,8 @@ export function useGoGame(audio: AudioPreferences) {
     const next={...current,assists:{...current.assists,[key]:value}};
     replaceLearningProgress(next);
     if(key === "explainMoves") {setMoveExplanation("");cancelExplanationSpeech();}
-    if(hydratedRef.current) localStorage.setItem(SAVE_KEY,encodeSave({game:matchState,learning:next,difficulty,volume:audio.volume,category:audio.category,
-      confirmMoves:confirmMovesRef.current,scoring:{phase:scorePhaseRef.current,deadStones:[...deadStones],outcome,graduationEligible:graduationEligibleRef.current}}));
+    if(hydratedRef.current) { try { localStorage.setItem(SAVE_KEY,encodeSave({game:matchState,learning:next,difficulty,volume:audio.volume,category:audio.category,
+      confirmMoves:confirmMovesRef.current,scoring:{phase:scorePhaseRef.current,deadStones:[...deadStones],outcome,graduationEligible:graduationEligibleRef.current}})); } catch { /* Settings remain available in memory. */ } }
   };
   useEffect(() => () => cancelExplanationSpeech(), [mode,learningSession.unit.id,glossaryBlocked,learningProgress.assists.explainMoves,cancelExplanationSpeech]);
   useEffect(() => {
@@ -220,12 +224,14 @@ export function useGoGame(audio: AudioPreferences) {
   }, [mode,learningSession.unit.id,learningProgress.assists.autoOpenTerms]);
 
   useEffect(() => {
-    const raw = localStorage.getItem(SAVE_KEY);
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(SAVE_KEY); } catch { /* Play without browser storage. */ }
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
+      const saved = raw ? decodeSave(raw) : null;
+      setFirstVisit(!saved);
       if (raw) {
-        const saved = decodeSave(raw);
         if (saved) {
           confirmMovesRef.current=saved.confirmMoves === true;
           setConfirmMovesState(confirmMovesRef.current);
@@ -243,7 +249,7 @@ export function useGoGame(audio: AudioPreferences) {
           setDifficultyState(saved.difficulty);
           audio.restore(saved.volume, saved.category);
         } else {
-          localStorage.removeItem(SAVE_KEY);
+          try { localStorage.removeItem(SAVE_KEY); } catch { /* A bad save cannot block a fresh lesson. */ }
           toast.info("旧棋局无法恢复，已为你新开一局");
         }
       }
@@ -256,7 +262,7 @@ export function useGoGame(audio: AudioPreferences) {
 
   useEffect(() => {
     if (!hydratedRef.current) return;
-    localStorage.setItem(
+    try { localStorage.setItem(
       SAVE_KEY,
       encodeSave({
         game: matchState,
@@ -268,7 +274,7 @@ export function useGoGame(audio: AudioPreferences) {
         scoring: { phase: scorePhase, deadStones: [...deadStones], outcome,
           graduationEligible: graduationEligibleRef.current },
       }),
-    );
+    ); } catch { /* Keep the current game usable without persistence. */ }
   }, [audio.category, audio.volume, difficulty, learningProgress, matchState, scorePhase, deadStones, outcome, confirmMoves]);
 
   useEffect(() => () => workerRef.current?.terminate(), []);
@@ -500,8 +506,8 @@ export function useGoGame(audio: AudioPreferences) {
 
   const setConfirmMoves = (value:boolean) => {
     confirmMovesRef.current=value;setConfirmMovesState(value);clearPreview();
-    if(hydratedRef.current) localStorage.setItem(SAVE_KEY,encodeSave({game:matchStateRef.current,learning:learningProgressRef.current,difficulty,volume:audio.volume,category:audio.category,confirmMoves:value,
-      scoring:{phase:scorePhaseRef.current,deadStones:[...deadStones],outcome:outcomeRef.current,graduationEligible:graduationEligibleRef.current}}));
+    if(hydratedRef.current) { try { localStorage.setItem(SAVE_KEY,encodeSave({game:matchStateRef.current,learning:learningProgressRef.current,difficulty,volume:audio.volume,category:audio.category,confirmMoves:value,
+      scoring:{phase:scorePhaseRef.current,deadStones:[...deadStones],outcome:outcomeRef.current,graduationEligible:graduationEligibleRef.current}})); } catch { /* Confirmation remains available in memory. */ } }
   };
   const selectPoint = async (point:Point):Promise<MoveResult> => {
     if(reviewRef.current || actionGeneration !== generationRef.current || mode !== modeRef.current || busyRef.current) return {ok:false,reason:"finished"};
@@ -511,7 +517,15 @@ export function useGoGame(audio: AudioPreferences) {
     const current=lesson?.state ?? matchStateRef.current;
     if(mode === "scoring" || lesson?.completed || (!lesson && current.toPlay !== "black")) return {ok:false,reason:"finished"};
     const result=playMove(current,point);
-    if(!result.ok) {clearPreview();toast.warning(moveErrorText[result.reason]);return result;}
+    if(!result.ok) {
+      clearPreview();
+      if(lesson && !learningSession.isQuizActive()) {
+        learningSession.reportRejectedMove(point);
+        setMoveExplanation("");cancelExplanationSpeech();
+      }
+      else toast.warning(lesson ? "本次还不正确，请再检查任务。" : moveErrorText[result.reason]);
+      return result;
+    }
     const candidate:Preview={point:{...point},state:current,session:lesson,generation:actionGeneration,mode};
     previewRef.current=candidate;setPreview(candidate);return result;
   };
@@ -525,6 +539,7 @@ export function useGoGame(audio: AudioPreferences) {
   const startReview = () => {
     if(actionGeneration !== generationRef.current || modeRef.current === "lesson" || busyRef.current || reviewRef.current || !matchStateRef.current.past.length) return false;
     clearPreview();setPracticeOpen(false);generationRef.current+=1;
+    setMoveExplanation("");cancelExplanationSpeech();
     const next={source:matchStateRef.current,index:matchStateRef.current.past.length};reviewRef.current=next;setReview(next);return true;
   };
   const seekReview = (index:number) => {
@@ -535,7 +550,13 @@ export function useGoGame(audio: AudioPreferences) {
   const endReview = () => {if(actionGeneration !== generationRef.current || !reviewRef.current) return;generationRef.current+=1;clearReview();};
   const previewValid=preview && preview.mode===mode &&
     (preview.session ? preview.session === learningSession.session : preview.state === matchState);
+  const failurePoint = learningSession.feedback?.failure?.point;
+  const attemptedPoint = mode === "lesson" && !glossaryBlocked && !learningSession.feedback?.completed &&
+    learningSession.session.feedbackExerciseId === learningSession.session.exercise?.id && failurePoint &&
+    isPointOnBoard(failurePoint, learningSession.state.size) ? failurePoint : null;
   return {
+    firstVisit, attemptedPoint,
+    coachRound: mode === "play" && !review && learningProgress.assists.explainMoves ? getCoachRound(matchState) : [],
     confirmMoves,setConfirmMoves,previewPoint:previewValid ? preview.point : null,selectPoint,confirmMove,cancelMove:clearPreview,
     reviewing:!!review,reviewIndex:review?.index ?? 0,reviewTotal:review?.source.past.length ?? matchState.past.length,
     reviewMoments:getReviewMoments(review?.source ?? matchState),startReview,seekReview,endReview,

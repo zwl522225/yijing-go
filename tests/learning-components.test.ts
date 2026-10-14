@@ -12,7 +12,7 @@ import { LESSON_UNIT_IDS, type LessonUnitId } from "@/lib/learning/types";
 import { createPosition } from "@/lib/learning/positions";
 function controller(id: LessonUnitId): LearningSessionController {
     const session = createLearningSession(id);
-    return { getSession:()=>session, session, unit: CURRICULUM_BY_ID.get(id)!, state: session.state, feedback: null, visibleHints: session.exercise?.hints.slice(0, session.hintLevel) ?? [], selectedDeadStone: null, startUnit: vi.fn(), isQuizActive: vi.fn(), submitMove: vi.fn(), submitPass: vi.fn(), submitGroup: vi.fn(), submitDeadStone: vi.fn(), selectDeadStone: vi.fn(), submitChoice: vi.fn(), requestHint: vi.fn(), retryExercise: vi.fn(), undoExercise: vi.fn(), resetUnit: vi.fn() };
+    return { getSession:()=>session, session, unit: CURRICULUM_BY_ID.get(id)!, state: session.state, feedback: null, visibleHints: session.exercise?.hints.slice(0, session.hintLevel) ?? [], selectedDeadStone: null, startUnit: vi.fn(), isQuizActive: vi.fn(), reportRejectedMove: vi.fn(), submitMove: vi.fn(), submitPass: vi.fn(), submitGroup: vi.fn(), submitDeadStone: vi.fn(), selectDeadStone: vi.fn(), submitChoice: vi.fn(), requestHint: vi.fn(), retryExercise: vi.fn(), undoExercise: vi.fn(), resetUnit: vi.fn() };
 }
 function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
     if (!node || typeof node !== "object")

@@ -65,7 +65,7 @@ export function revealNextHint(session: LearningSession): LearningSession {
     return { ...session, hintLevel: Math.min(3, session.hintLevel + 1) };
 }
 export function undoLearningAction(session: LearningSession): LearningSession {
-    return session.previous ?? session;
+    return session.previous ? { ...session.previous, feedback: null, feedbackExerciseId: undefined } : session;
 }
 export function updateSessionProgress(session: LearningSession, progress: LearningProgress): LearningProgress {
     const unit = CURRICULUM_BY_ID.get(session.unitId)!;
@@ -130,6 +130,14 @@ export function useLearningSession(options: {
         session, unit, state: session.state, feedback: session.feedback, visibleHints, selectedDeadStone,
         startUnit,
         isQuizActive: () => CURRICULUM_BY_ID.get(sessionRef.current.unitId)?.kind === "quiz" && !sessionRef.current.completed,
+        /** Rejected previews explain rules without becoming submitted answers. */
+        reportRejectedMove: (point: Point) => {
+            const current = sessionRef.current;
+            if (current.completed || !current.exercise || CURRICULUM_BY_ID.get(current.unitId)?.kind === "quiz") return;
+            const feedback = applyLessonAction(current.exercise, current.state, { kind: "move", point });
+            if (feedback.failure?.kind === "rule")
+                replace({ ...current, feedback, feedbackExerciseId: current.exercise.id });
+        },
         submitMove: (point: Point) => submit({ kind: "move", point }),
         submitPass: () => submit({ kind: "pass" }),
         submitGroup: (point: Point) => submit({ kind: "select-group", point }),
@@ -144,7 +152,7 @@ export function useLearningSession(options: {
             const current = sessionRef.current;
             if (!current.exercise || current.completed)
                 return;
-            reset({ ...current, state: createPosition(current.exercise.position), feedback: null });
+            reset({ ...current, state: createPosition(current.exercise.position), feedback: null, feedbackExerciseId: undefined });
         },
         undoExercise: () => reset(undoLearningAction(sessionRef.current)),
         resetUnit: () => reset(createLearningSession(sessionRef.current.unitId)),

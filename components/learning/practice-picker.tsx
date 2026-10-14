@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { LessonFeedback } from "@/components/learning/lesson-feedback";
 import { applyLessonAction, type ExerciseResult } from "@/lib/learning/evaluate";
 import { createPosition } from "@/lib/learning/positions";
 import { getPracticeTopics, getWrongQuestionPractice } from "@/lib/learning/practice";
@@ -37,7 +38,7 @@ export function ExercisePractice({exercise,label,onComplete,successLabel,boardLa
       {exercise.expected.kind==="choice" ? exercise.choices?.map(choice=><button key={choice.id} type="button" data-choice-id={choice.id} disabled={completed} onClick={()=>submit({kind:"choice",choiceId:choice.id})}>{choice.label}</button>) : null}
       {exercise.expected.kind==="select-group" || exercise.expected.kind==="mark-dead" ? <button type="button" data-action={exercise.expected.kind} disabled={completed || !attempt.selected} onClick={()=>{if(attempt.selected && (exercise.expected.kind==="select-group" || exercise.expected.kind==="mark-dead")) submit({kind:exercise.expected.kind,point:attempt.selected});}}>{exercise.expected.kind==="mark-dead" ? "确认死子" : "确认棋块"}</button> : null}
     </div>
-    {attempt.feedback ? <p className={`lesson-feedback ${completed ? "success" : "retry"}`} role="status">{completed && successLabel ? successLabel+" · "+attempt.feedback.message : attempt.feedback.message}</p> : null}
+    <LessonFeedback feedback={attempt.feedback} actionKind={exercise.expected.kind} successLabel={successLabel}/>
     <div className="term-practice-actions"><button type="button" data-action="retry" onClick={()=>setAttempt({state:createPosition(exercise.position),feedback:null,selected:null,hintLevel:0})}>重新练习</button><button type="button" data-action="hint" disabled={completed || attempt.hintLevel>=3} onClick={()=>setAttempt({...attempt,hintLevel:Math.min(3,attempt.hintLevel+1)})}>查看提示（{attempt.hintLevel}/3）</button></div>
     {exercise.hints.slice(0,attempt.hintLevel).map(hint=><p key={hint.level}>{hint.level}. {hint.text}</p>)}
   </section>;

@@ -1,18 +1,22 @@
 "use client";
 
+import { useState, type MouseEvent } from "react";
+import { FeedbackDialog } from "@/components/game/feedback-dialog";
+import { createFeedbackReport, type FeedbackContext } from "@/lib/learning/feedback-report";
 import { ControlPanel } from "@/components/game/control-panel";
 import { GoBoard } from "@/components/game/go-board";
 import { InkScene } from "@/components/game/ink-scene";
 import { MusicPlayer } from "@/components/game/music-player";
 import { ResultDialog } from "@/components/game/result-dialog";
 import { LearningRoadmap } from "@/components/learning/learning-roadmap";
-import { LessonPanel } from "@/components/learning/lesson-panel";
+import { LessonTask, LessonDetails } from "@/components/learning/lesson-panel";
 import { LearningAssistPanel } from "@/components/learning/learning-assist-panel";
 import { PracticeDialog } from "@/components/learning/practice-picker";
 import { ReviewPanel } from "@/components/game/review-panel";
 import { GlossaryDialog } from "@/components/learning/glossary-dialog";
 import { getRecommendedUnit, isGraduated } from "@/lib/learning/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BeginnerGuide } from "@/components/game/beginner-guide";
+import { CoachPanel } from "@/components/game/coach-panel";
 import { Toaster } from "@/components/ui/sonner";
 import { useGoGame } from "@/hooks/use-go-game";
 import { useSoundscape } from "@/hooks/use-soundscape";
@@ -29,6 +33,16 @@ export function GameApp() {
     },
   });
   useWebMcp(game, soundscape);
+  const [feedback, setFeedback] = useState<{ context: FeedbackContext; opener: HTMLButtonElement } | null>(null);
+  function openFeedback(event: MouseEvent<HTMLButtonElement>) {
+    const mode = game.reviewing ? "review" : game.glossaryBlocked ? "quiz" : game.mode;
+    const context: FeedbackContext = { mode, boardSize: game.state.size };
+    if (mode === "lesson") {
+      context.lessonTitle = game.learningSession.unit.title;
+      context.actionKind = game.learningSession.session.exercise?.expected.kind;
+    }
+    setFeedback({ context: createFeedbackReport(context, "operation", "").context, opener: event.currentTarget });
+  }
 
   const isLesson = game.mode === "lesson";
   const boardTitle = game.reviewing ? "逐手复盘 · 第 "+game.reviewIndex+" 手" : isLesson
@@ -61,6 +75,15 @@ export function GameApp() {
       </header>
 
       <section className={`game-shell${isLesson ? " academy-layout" : ""}`} id="game">
+        <nav className="mode-tabs" aria-label="游戏模式">
+          <div className="mode-tabs-list">
+            <button type="button" aria-pressed={!isLesson} data-state={!isLesson ? "active" : "inactive"} onClick={game.startPlay}>人机对局</button>
+            <button type="button" aria-pressed={isLesson} data-state={isLesson ? "active" : "inactive"} onClick={()=>{if(!isLesson) game.startUnit(getRecommendedUnit(game.learningProgress) ?? game.learningSession.unit.id);}}>新手学堂</button>
+          </div>
+        </nav>
+        <BeginnerGuide firstVisit={game.firstVisit && isLesson} quizActive={game.glossaryBlocked} showContinueLearning={!isLesson}
+          onContinueLearning={()=>game.startUnit(getRecommendedUnit(game.learningProgress) ?? game.learningSession.unit.id)}/>
+        {isLesson ? <LessonTask learning={game.learningSession} graduated={isGraduated(game.learningProgress)} onStartGraduation={()=>game.startNewGame(9)}/> : null}
         <GoBoard
           key={`${game.state.size}-${isLesson ? game.learningSession.session.unitId : "match"}`}
           state={game.state}
@@ -74,48 +97,36 @@ export function GameApp() {
           deadStones={isLesson || game.reviewing ? new Set() : game.deadStones}
           readOnly={game.reviewing}
           previewPoint={game.previewPoint}
+          attemptedPoint={game.attemptedPoint}
           selectedPoints={isLesson && game.learningSession.selectedDeadStone ? [game.learningSession.selectedDeadStone] : []}
           aiThinking={!isLesson && game.aiThinking}
           onPlay={(point) => { void game.selectPoint(point); }}
           onToggleDead={game.toggleDeadStone}
         />
 
-        <aside className="game-sidebar" aria-label="棋局控制">
+        <section className="board-settings" aria-label="棋盘操作设置">
           <section className="panel move-confirm-panel" aria-label="落子操作设置">
             <label><input type="checkbox" data-setting="confirm-moves" checked={game.confirmMoves} onChange={event=>game.setConfirmMoves(event.target.checked)}/> 确认落子</label>
             <p>先选落点，再确认；取消后可重新选择。</p>
             {game.previewPoint ? <div className="move-confirm-controls" role="status"><span>待落在（{game.previewPoint.x+1}，{game.previewPoint.y+1}）</span><button type="button" data-action="confirm-move" onClick={()=>{void game.confirmMove();}}>确认落子</button><button type="button" data-action="cancel-move" onClick={game.cancelMove}>取消</button></div> : null}
           </section>
+          <LearningAssistPanel assists={game.learningProgress.assists} isQuiz={game.glossaryBlocked} onChange={game.setLearningAssist}/>
+        </section>
+        <aside className="game-sidebar" aria-label="棋局控制">
           {!isLesson && !game.reviewing && game.matchState.past.length ? <button type="button" className="dictionary-button review-entry" data-action="start-review" disabled={game.aiThinking} onClick={game.startReview}>逐手复盘</button> : null}
           {game.reviewing ? <ReviewPanel index={game.reviewIndex} total={game.reviewTotal} moments={game.reviewMoments} progress={game.learningProgress} onSeek={game.seekReview} onExit={game.endReview} onStartLesson={id=>{game.startUnit(id);}} onOpenTerm={game.openTerm}/> : null}
-          <LearningAssistPanel assists={game.learningProgress.assists} isQuiz={game.glossaryBlocked} onChange={game.setLearningAssist}/>
-          {game.moveExplanation ? <p className="panel move-explanation" role="status" aria-live="polite">{game.moveExplanation}</p> : null}
-          <Tabs
-            value={isLesson ? "lesson" : "play"}
-            onValueChange={(value) => {
-              if (value === "lesson") game.startUnit(getRecommendedUnit(game.learningProgress) ?? game.learningSession.unit.id);
-              else game.startPlay();
-            }}
-            className="mode-tabs"
-          >
-            <TabsList className="mode-tabs-list" aria-label="游戏模式">
-              <TabsTrigger value="play">人机对局</TabsTrigger>
-              <TabsTrigger value="lesson">新手学堂</TabsTrigger>
-            </TabsList>
-            <TabsContent value="lesson">
-              <LessonPanel learning={game.learningSession} graduated={isGraduated(game.learningProgress)} onOpenTerm={game.openTerm} onStartGraduation={() => game.startNewGame(9)} />
-              <LearningRoadmap progress={game.learningProgress} currentUnitId={game.learningSession.unit.id} onSelectUnit={game.startUnit} />
-            </TabsContent>
-            <TabsContent value="play">
-              {!game.reviewing ? <ControlPanel game={game} /> : null}
-            </TabsContent>
-          </Tabs>
+          {isLesson && game.moveExplanation ? <p className="panel move-explanation" role="status" aria-live="polite">{game.moveExplanation}</p> : null}
+          <CoachPanel turns={game.coachRound} onOpenTerm={game.openTerm}/>
+          {isLesson ? <>
+            <LessonDetails learning={game.learningSession} onOpenTerm={game.openTerm}/>
+            <LearningRoadmap progress={game.learningProgress} currentUnitId={game.learningSession.unit.id} onSelectUnit={game.startUnit}/>
+          </> : !game.reviewing ? <ControlPanel game={game}/> : null}
 
           <MusicPlayer soundscape={soundscape} />
         </aside>
       </section>
 
-      <footer className="site-footer"><span className="seal">弈境</span><p>静心落子，慢慢变强。</p></footer>
+      <footer className="site-footer"><span className="seal">弈境</span><p>静心落子，慢慢变强。</p><button type="button" className="dictionary-button feedback-entry" data-action="open-feedback" onClick={openFeedback}>遇到困难？反馈一下</button></footer>
 
       <ResultDialog
         open={game.mode === "scoring" && !game.reviewing}
@@ -130,7 +141,9 @@ export function GameApp() {
         onToggleDead={game.toggleDeadStone}
         onNewGame={game.newGame}
         onReview={game.startReview}
+        onFeedback={openFeedback}
       />
+      {feedback ? <FeedbackDialog context={feedback.context} opener={feedback.opener} onClose={() => setFeedback(null)} /> : null}
       <PracticeDialog open={game.practiceOpen} progress={game.learningProgress} onClose={game.closePractice}/>
       <Toaster position="top-center" />
       <GlossaryDialog open={game.glossaryOpen} termId={game.glossaryTermId} progress={game.learningProgress}
