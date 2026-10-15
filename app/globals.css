@@ -485,6 +485,8 @@ button:focus-visible, a:focus-visible {
 .review-panel h2 { font-family: var(--font-serif); font-size: 20px; }
 .review-panel h3 { font-size: 15px; margin-top: 18px; }
 .review-panel p, .practice-picker > p { font-size: 13px; line-height: 1.7; }
+.review-current-step { margin-top: 18px; padding: 0 0 16px; border-bottom: 1px solid rgba(105,79,53,.2); }
+.review-current-step p { margin: 8px 0; }
 .review-moments { padding: 0; list-style: none; }
 .review-moments li { border-top: 1px solid rgba(105,79,53,.2); padding: 12px 0; }
 .review-moments strong { display: block; font-size: 13px; margin-top: 8px; }

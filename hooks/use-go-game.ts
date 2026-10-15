@@ -21,7 +21,7 @@ import type { LearningAssists, LearningProgress } from "@/lib/learning/progress"
 import { useLearningSession } from "@/hooks/use-learning-session";
 import type { LessonUnitId, TermId, TermStatus } from "@/lib/learning/types";
 import { GLOSSARY_BY_ID } from "@/lib/learning/glossary";
-import { getReviewFrames, getReviewMoments } from "@/lib/go/review";
+import { analyzeReview, type ReviewAnalysis } from "@/lib/go/review";
 import type { LearningSession } from "@/hooks/use-learning-session";
 import { CURRICULUM_BY_ID } from "@/lib/learning/curriculum";
 
@@ -98,7 +98,7 @@ export function useGoGame(audio: AudioPreferences) {
   const [preview, setPreview] = useState<Preview|null>(null);
   const previewRef = useRef<Preview|null>(null);
   const clearPreview = useCallback(() => {previewRef.current=null;setPreview(null);},[]);
-  type Review = {source:GameState;index:number};
+  type Review = {source:GameState;index:number;analysis:ReviewAnalysis};
   const [review, setReview] = useState<Review|null>(null);
   const reviewRef = useRef<Review|null>(null);
   const clearReview = useCallback(() => {reviewRef.current=null;setReview(null);},[]);
@@ -215,7 +215,9 @@ export function useGoGame(audio: AudioPreferences) {
     } catch { queueMicrotask(() => setStorageUnavailable(true)); }
   };
 
-  const state = review ? getReviewFrames(review.source)[review.index] : mode === "lesson" ? learningSession.state : matchState;
+  const state = review ? review.index === review.source.past.length ? review.source :
+    {...review.source.past[review.index],past:review.source.past.slice(0,review.index)} :
+    mode === "lesson" ? learningSession.state : matchState;
   const glossaryBlocked = mode === "lesson" && learningSession.unit.kind === "quiz" && !learningSession.session.completed;
   const recordTermStatus = (id:TermId,status:TermStatus) => {
     if(!GLOSSARY_BY_ID.has(id) || (modeRef.current === "lesson" && learningSession.isQuizActive())) return;
@@ -585,7 +587,8 @@ export function useGoGame(audio: AudioPreferences) {
     if(actionGeneration !== generationRef.current || modeRef.current === "lesson" || busyRef.current || reviewRef.current || !matchStateRef.current.past.length) return false;
     clearPreview();setPracticeOpen(false);generationRef.current+=1;
     setMoveExplanation("");cancelExplanationSpeech();
-    const next={source:matchStateRef.current,index:matchStateRef.current.past.length};reviewRef.current=next;setReview(next);return true;
+    const source=matchStateRef.current;
+    const next={source,index:source.past.length,analysis:analyzeReview(source)};reviewRef.current=next;setReview(next);return true;
   };
   const seekReview = (index:number) => {
     if(actionGeneration !== generationRef.current || !reviewRef.current || !Number.isFinite(index)) return;
@@ -604,7 +607,8 @@ export function useGoGame(audio: AudioPreferences) {
     coachRound: mode === "play" && !review && learningProgress.assists.explainMoves ? getCoachRound(matchState) : [],
     confirmMoves,setConfirmMoves,previewPoint:previewValid ? preview.point : null,selectPoint,confirmMove,cancelMove:clearPreview,
     reviewing:!!review,reviewIndex:review?.index ?? 0,reviewTotal:review?.source.past.length ?? matchState.past.length,
-    reviewMoments:getReviewMoments(review?.source ?? matchState),startReview,seekReview,endReview,
+    reviewStep:review?.analysis.steps[review.index] ?? null,
+    reviewMoments:review?.analysis.moments ?? [],startReview,seekReview,endReview,
     practiceOpen:practiceOpen && !glossaryBlocked,openPractice,closePractice,
     mode,
     state,

@@ -5,6 +5,7 @@ import { CURRICULUM } from "@/lib/learning/curriculum";
 import { LESSON_UNIT_IDS } from "@/lib/learning/types";
 import { createGame, passTurn, playMove } from "@/lib/go/rules";
 import { getReviewFrames, getReviewMoments } from "@/lib/go/review";
+import { getCoachTurn } from "@/lib/go/coach";
 
 describe("independent practice catalog", () => {
   it("offers only currently unlocked curriculum exercises", () => {
@@ -54,7 +55,7 @@ describe("read only replay and educational moments", () => {
     const move=playMove(match,{x:2,y:1});if(!move.ok)throw new Error("legal atari setup");
     const moments=getReviewMoments(move.state);
     expect(moments).toHaveLength(1);expect(moments[0]).toMatchObject({kind:"atari",color:"black",frame:1,termId:"atari"});
-    expect(moments[0].consequence).toBe("对方 1 块棋只剩一口气。");expect(move.state.captures.black).toBe(0);
+    expect(moments[0].consequence).toBe(getCoachTurn(match,{x:2,y:1},move)?.summary);expect(move.state.captures.black).toBe(0);
   });
   it("selects at most three meaningful actual moments and fewer for short games", () => {
     expect(getReviewMoments(createGame({size:5}))).toEqual([]);

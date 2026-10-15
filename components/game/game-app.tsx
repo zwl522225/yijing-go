@@ -115,7 +115,7 @@ export function GameApp() {
         <aside className="game-sidebar" aria-label="棋局控制">
           {!isLesson && game.storageUnavailable ? <p role="status">无法保存进度：浏览器存储不可用，刷新后可能丢失本次位置。</p> : null}
           {!isLesson && !game.reviewing && game.matchState.past.length ? <button type="button" className="dictionary-button review-entry" data-action="start-review" disabled={game.aiThinking} onClick={game.startReview}>逐手复盘</button> : null}
-          {game.reviewing ? <ReviewPanel index={game.reviewIndex} total={game.reviewTotal} moments={game.reviewMoments} progress={game.learningProgress} onSeek={game.seekReview} onExit={game.endReview} onStartLesson={id=>{game.startUnit(id);}} onOpenTerm={game.openTerm}/> : null}
+          {game.reviewing && game.reviewStep ? <ReviewPanel index={game.reviewIndex} total={game.reviewTotal} step={game.reviewStep} moments={game.reviewMoments} progress={game.learningProgress} onSeek={game.seekReview} onExit={game.endReview} onStartLesson={id=>{game.startUnit(id);}} onOpenTerm={game.openTerm}/> : null}
           {isLesson && game.moveExplanation ? <p className="panel move-explanation" role="status" aria-live="polite">{game.moveExplanation}</p> : null}
           <CoachPanel turns={game.coachRound} onOpenTerm={game.openTerm}/>
           {isLesson ? <>

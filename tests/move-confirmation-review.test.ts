@@ -3,6 +3,7 @@ import { useGoGame } from "@/hooks/use-go-game";
 import { decodeSave, encodeSave } from "@/lib/go/storage";
 import { createGame } from "@/lib/go/rules";
 import { createDefaultProgress } from "@/lib/learning/progress";
+import * as reviewAnalysis from "@/lib/go/review";
 const host = vi.hoisted(() => ({ values: [] as unknown[], refs: [] as {current: unknown}[], cursor: 0, refCursor: 0 }));
 vi.mock("react", async original => ({ ...await original<typeof import("react")>(),
   useState(initial: unknown) { const i=host.cursor++; if(!(i in host.values)) host.values[i]=typeof initial==="function" ? (initial as ()=>unknown)() : initial;
@@ -14,7 +15,7 @@ function useTestGame(){return useGoGame({volume:.5,category:"pop",restore(){}});
 function renderHook<T>(hook:()=>T){host.cursor=0;host.refCursor=0;return hook();}
 const render=()=>renderHook(useTestGame);
 beforeEach(()=>{host.values=[];host.refs=[];vi.stubGlobal("Worker",undefined);});
-afterEach(()=>vi.unstubAllGlobals());
+afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe("move confirmation",()=>{
   it("defaults off and roundtrips independently of learning assists with safe legacy defaults",()=>{
     expect(render().confirmMoves).toBe(false);
@@ -52,6 +53,53 @@ describe("move confirmation",()=>{
   });
 });
 describe("review runtime guards",()=>{
+  it("analyzes only on entry and reuses current-step facts and highlights across renders and navigation",async()=>{
+    const analyze=vi.spyOn(reviewAnalysis,"analyzeReview");
+    let game=render();game.startNewGame(5);game=render();await game.play({x:0,y:0});game=render();
+    expect(game.reviewStep).toBeNull();expect(game.reviewMoments).toEqual([]);expect(analyze).not.toHaveBeenCalled();
+    const speak=vi.fn();vi.stubGlobal("window",{speechSynthesis:{speak,cancel:vi.fn()}});
+    vi.stubGlobal("SpeechSynthesisUtterance",class {lang="";constructor(public text:string){}});
+    game.setLearningAssist("explainMoves",true);game=render();
+    const source=game.matchState,progress=structuredClone(game.learningProgress),lesson=structuredClone(game.learningSession.session);
+    expect(game.startReview()).toBe(true);game=render();
+    expect(analyze).toHaveBeenCalledExactlyOnceWith(source);
+    expect(analyze.mock.calls[0][0]).toBe(source);
+    const lastStep=game.reviewStep,moments=game.reviewMoments;
+    expect(lastStep).toMatchObject({status:"verified",turn:{actor:"white",moveNumber:2}});
+    game=render();expect(game.reviewStep).toBe(lastStep);expect(game.reviewMoments).toBe(moments);
+    game.seekReview(0);game=render();expect(game.reviewStep).toEqual({status:"opening"});expect(game.state.moves).toHaveLength(0);
+    game.seekReview(1);game=render();expect(game.reviewStep).toMatchObject({status:"verified",turn:{actor:"black",moveNumber:1}});
+    expect(game.learningProgress).toEqual(progress);
+    const blackStep=game.reviewStep;game.openTerm("liberty");game=render();game.closeGlossary();game=render();
+    expect(game.reviewStep).toBe(blackStep);expect(game.reviewIndex).toBe(1);expect(game.glossaryOpen).toBe(false);
+    game.seekReview(999);game=render();expect(game.reviewStep).toBe(lastStep);expect(game.reviewMoments).toBe(moments);
+    expect(analyze).toHaveBeenCalledTimes(1);expect(game.matchState).toBe(source);expect(game.learningSession.session).toEqual(lesson);expect(speak).not.toHaveBeenCalled();
+    expect(game.learningProgress).toEqual({...progress,termStates:{...progress.termStates,liberty:"seen"}});
+    game.endReview();game=render();expect(game.reviewStep).toBeNull();expect(game.reviewMoments).toEqual([]);expect(game.state).toBe(source);
+    game.startReview();game=render();expect(analyze).toHaveBeenCalledTimes(2);expect(game.reviewStep).toEqual(lastStep);expect(game.reviewStep).not.toBe(lastStep);
+  });
+  it("preserves an accepted ordinary lesson bookmark while reviewing and returning to learning",async()=>{
+    let game=render();game.learningSession.submitMove({x:2,y:2});game=render();
+    expect(game.learningSession.session.exerciseIndex).toBe(1);const lesson=structuredClone(game.learningSession.session);
+    game.startNewGame(5);game=render();await game.play({x:0,y:0});game=render();const progress=structuredClone(game.learningProgress);
+    game.startReview();game=render();game.seekReview(0);game=render();game.seekReview(1);game=render();game.endReview();game=render();
+    expect(game.learningProgress).toEqual(progress);expect(game.learningSession.session).toEqual(lesson);
+    game.continueLearning();game=render();expect(game.mode).toBe("lesson");expect(game.learningSession.session.exerciseIndex).toBe(1);
+    expect(game.learningSession.session.acceptedActions).toEqual(lesson.acceptedActions);
+  });
+  it("keeps retained navigation isolated after exit, a new review and a new match",async()=>{
+    let game=render();game.startNewGame(5);game=render();await game.play({x:0,y:0});game=render();game.startReview();game=render();
+    const oldSeek=game.seekReview;game.endReview();oldSeek(0);game=render();expect(game.reviewStep).toBeNull();
+    game.startReview();game=render();const step=game.reviewStep;oldSeek(0);game=render();expect(game.reviewIndex).toBe(2);expect(game.reviewStep).toBe(step);
+    const retainedSeek=game.seekReview;game.startNewGame(7);retainedSeek(0);game=render();expect(game.reviewing).toBe(false);expect(game.reviewStep).toBeNull();expect(game.state.size).toBe(7);
+  });
+  it("exposes unavailable recorded frames without changing the original source",async()=>{
+    let game=render();game.startNewGame(5);game=render();await game.play({x:0,y:0});game=render();
+    game.matchState.captures.white=42;const source=structuredClone(game.matchState);
+    game.startReview();game=render();expect(game.reviewStep).toEqual({status:"unavailable"});expect(game.state).toEqual(source);
+    game.seekReview(1);game=render();expect(game.reviewStep?.status).toBe("verified");
+    game.endReview();game=render();expect(game.matchState).toEqual(source);
+  });
   it("ignores a retained exit callback from an earlier review session",async()=>{
     let game=render();game.startNewGame(5);game=render();await game.play({x:0,y:0});game=render();game.startReview();game=render();const oldExit=game.endReview;
     game.endReview();game=render();game.startReview();game=render();oldExit();game=render();expect(game.reviewing).toBe(true);
