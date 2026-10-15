@@ -14,7 +14,7 @@ import { LearningAssistPanel } from "@/components/learning/learning-assist-panel
 import { PracticeDialog } from "@/components/learning/practice-picker";
 import { ReviewPanel } from "@/components/game/review-panel";
 import { GlossaryDialog } from "@/components/learning/glossary-dialog";
-import { getRecommendedUnit, isGraduated } from "@/lib/learning/progress";
+import { isGraduated } from "@/lib/learning/progress";
 import { BeginnerGuide } from "@/components/game/beginner-guide";
 import { CoachPanel } from "@/components/game/coach-panel";
 import { Toaster } from "@/components/ui/sonner";
@@ -78,11 +78,11 @@ export function GameApp() {
         <nav className="mode-tabs" aria-label="游戏模式">
           <div className="mode-tabs-list">
             <button type="button" aria-pressed={!isLesson} data-state={!isLesson ? "active" : "inactive"} onClick={game.startPlay}>人机对局</button>
-            <button type="button" aria-pressed={isLesson} data-state={isLesson ? "active" : "inactive"} onClick={()=>{if(!isLesson) game.startUnit(getRecommendedUnit(game.learningProgress) ?? game.learningSession.unit.id);}}>新手学堂</button>
+            <button type="button" aria-pressed={isLesson} data-state={isLesson ? "active" : "inactive"} onClick={()=>{if(!isLesson) game.continueLearning();}}>新手学堂</button>
           </div>
         </nav>
         <BeginnerGuide firstVisit={game.firstVisit && isLesson} quizActive={game.glossaryBlocked} showContinueLearning={!isLesson}
-          onContinueLearning={()=>game.startUnit(getRecommendedUnit(game.learningProgress) ?? game.learningSession.unit.id)}/>
+          onContinueLearning={game.continueLearning}/>
         {isLesson ? <LessonTask learning={game.learningSession} graduated={isGraduated(game.learningProgress)} onStartGraduation={()=>game.startNewGame(9)}/> : null}
         <GoBoard
           key={`${game.state.size}-${isLesson ? game.learningSession.session.unitId : "match"}`}
@@ -113,12 +113,13 @@ export function GameApp() {
           <LearningAssistPanel assists={game.learningProgress.assists} isQuiz={game.glossaryBlocked} onChange={game.setLearningAssist}/>
         </section>
         <aside className="game-sidebar" aria-label="棋局控制">
+          {!isLesson && game.storageUnavailable ? <p role="status">无法保存进度：浏览器存储不可用，刷新后可能丢失本次位置。</p> : null}
           {!isLesson && !game.reviewing && game.matchState.past.length ? <button type="button" className="dictionary-button review-entry" data-action="start-review" disabled={game.aiThinking} onClick={game.startReview}>逐手复盘</button> : null}
           {game.reviewing ? <ReviewPanel index={game.reviewIndex} total={game.reviewTotal} moments={game.reviewMoments} progress={game.learningProgress} onSeek={game.seekReview} onExit={game.endReview} onStartLesson={id=>{game.startUnit(id);}} onOpenTerm={game.openTerm}/> : null}
           {isLesson && game.moveExplanation ? <p className="panel move-explanation" role="status" aria-live="polite">{game.moveExplanation}</p> : null}
           <CoachPanel turns={game.coachRound} onOpenTerm={game.openTerm}/>
           {isLesson ? <>
-            <LessonDetails learning={game.learningSession} onOpenTerm={game.openTerm}/>
+            <LessonDetails learning={game.learningSession} storageUnavailable={game.storageUnavailable} onOpenTerm={game.openTerm}/>
             <LearningRoadmap progress={game.learningProgress} currentUnitId={game.learningSession.unit.id} onSelectUnit={game.startUnit}/>
           </> : !game.reviewing ? <ControlPanel game={game}/> : null}
 
@@ -137,7 +138,7 @@ export function GameApp() {
         graduated={isGraduated(game.learningProgress)}
         onConfirmDead={game.confirmDeadStones}
         onConfirmScore={game.confirmFinalScore}
-        onReturnAcademy={() => game.startUnit(getRecommendedUnit(game.learningProgress) ?? "s3-graduation")}
+        onReturnAcademy={game.continueLearning}
         onToggleDead={game.toggleDeadStone}
         onNewGame={game.newGame}
         onReview={game.startReview}

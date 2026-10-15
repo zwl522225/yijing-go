@@ -14,7 +14,8 @@ import { describeMove } from "@/lib/go/explain";
 import { decodeSave, encodeSave, SAVE_KEY } from "@/lib/go/storage";
 import type { BoardSize, GameState, Move, MoveError, MoveResult, Point } from "@/lib/go/types";
 import type { AiWorkerRequest, AiWorkerResponse } from "@/lib/go/ai.worker";
-import { advanceTermStatus, createDefaultProgress, isUnitUnlocked, recordGraduationEvent } from "@/lib/learning/progress";
+import { advanceTermStatus, createDefaultProgress, getRecommendedUnit, isUnitUnlocked, recordGraduationEvent } from "@/lib/learning/progress";
+import { createLessonResume, restoreLessonResume, type LessonResume } from "@/lib/learning/session-resume";
 import type { ScorePhase } from "@/lib/go/storage";
 import type { LearningAssists, LearningProgress } from "@/lib/learning/progress";
 import { useLearningSession } from "@/hooks/use-learning-session";
@@ -85,6 +86,11 @@ async function workerMove(
 }
 
 export function useGoGame(audio: AudioPreferences) {
+  const [hydrated, setHydrated] = useState(false);
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
+  const lessonResumeRef = useRef<LessonResume | null>(null);
+  const audioRef = useRef(audio);
+  useEffect(() => { audioRef.current = audio; }, [audio]);
   const [firstVisit, setFirstVisit] = useState(false);
   const [confirmMoves, setConfirmMovesState] = useState(false);
   const confirmMovesRef = useRef(false);
@@ -119,6 +125,7 @@ export function useGoGame(audio: AudioPreferences) {
     setMatchStateState(next);
   }, [clearPreview]);
   const [difficulty, setDifficultyState] = useState<Difficulty>("beginner");
+  const difficultyRef = useRef<Difficulty>("beginner");
   const [aiThinking, setAiThinking] = useState(false);
   const [learningProgress, setLearningProgress] = useState<LearningProgress>(createDefaultProgress);
   const learningProgressRef = useRef(learningProgress);
@@ -138,6 +145,12 @@ export function useGoGame(audio: AudioPreferences) {
     } catch { /* Unsupported or denied speech must never block a move. */ }
   },[]);
   const learningSession = useLearningSession({progress: learningProgress, onProgressChange: replaceLearningProgress, getProgress: () => learningProgressRef.current,
+    isActive: () => modeRef.current === "lesson",
+    onSessionChange(next) {
+      if (CURRICULUM_BY_ID.get(next.unitId)?.kind !== "lesson") return;
+      if (!next.completed) lessonResumeRef.current = createLessonResume(next);
+      else if (lessonResumeRef.current?.unitId === next.unitId) lessonResumeRef.current = null;
+    },
     onReset() {clearPreview();setPracticeOpen(false);setMoveExplanation("");cancelExplanationSpeech();},
     onAction(before,action,result) {
       const quiz=CURRICULUM_BY_ID.get(before.unitId)?.kind === "quiz";
@@ -151,7 +164,13 @@ export function useGoGame(audio: AudioPreferences) {
   });
   const [glossary, setGlossary] = useState<{open:boolean;termId:TermId|null}>({open:false,termId:null});
   const autoOpenedUnits = useRef(new Set<LessonUnitId>());
-  const [deadStones, setDeadStones] = useState<Set<string>>(() => new Set());
+  const [deadStones, setDeadStonesState] = useState<Set<string>>(() => new Set());
+  const deadStonesRef = useRef(deadStones);
+  const setDeadStones = useCallback((value: Set<string> | ((current:Set<string>)=>Set<string>)) => {
+    const next = typeof value === "function" ? value(deadStonesRef.current) : value;
+    deadStonesRef.current = next;
+    setDeadStonesState(next);
+  }, []);
   const [outcome, setOutcomeState] = useState<string | null>(null);
   const outcomeRef = useRef(outcome);
   const setOutcome = useCallback((next: string | null) => {
@@ -177,6 +196,24 @@ export function useGoGame(audio: AudioPreferences) {
   const busyRef = useRef(false);
   // A callback belongs to the match/lesson context in which it was rendered.
   const actionGeneration = generationRef.current;
+
+  // Every write, including immediate setting changes, uses the same live snapshot.
+  const persist = () => {
+    if (!hydratedRef.current) return;
+    const current = learningSession.getSession();
+    const lessonResume = lessonResumeRef.current;
+    const lastView = modeRef.current === "lesson" && !current.completed &&
+      CURRICULUM_BY_ID.get(current.unitId)?.kind === "lesson" && lessonResume?.unitId === current.unitId ? "lesson" : "play";
+    try {
+      localStorage.setItem(SAVE_KEY, encodeSave({
+        game:matchStateRef.current,learning:learningProgressRef.current,difficulty:difficultyRef.current,
+        volume:audioRef.current.volume,category:audioRef.current.category,confirmMoves:confirmMovesRef.current,
+        ...(lessonResume ? {lessonResume} : {}),lastView,
+        scoring:{phase:scorePhaseRef.current,deadStones:[...deadStonesRef.current],outcome:outcomeRef.current,
+          graduationEligible:graduationEligibleRef.current},
+      }));
+    } catch { queueMicrotask(() => setStorageUnavailable(true)); }
+  };
 
   const state = review ? getReviewFrames(review.source)[review.index] : mode === "lesson" ? learningSession.state : matchState;
   const glossaryBlocked = mode === "lesson" && learningSession.unit.kind === "quiz" && !learningSession.session.completed;
@@ -209,13 +246,12 @@ export function useGoGame(audio: AudioPreferences) {
     const next={...current,assists:{...current.assists,[key]:value}};
     replaceLearningProgress(next);
     if(key === "explainMoves") {setMoveExplanation("");cancelExplanationSpeech();}
-    if(hydratedRef.current) { try { localStorage.setItem(SAVE_KEY,encodeSave({game:matchState,learning:next,difficulty,volume:audio.volume,category:audio.category,
-      confirmMoves:confirmMovesRef.current,scoring:{phase:scorePhaseRef.current,deadStones:[...deadStones],outcome,graduationEligible:graduationEligibleRef.current}})); } catch { /* Settings remain available in memory. */ } }
+    persist();
   };
   useEffect(() => () => cancelExplanationSpeech(), [mode,learningSession.unit.id,glossaryBlocked,learningProgress.assists.explainMoves,cancelExplanationSpeech]);
   useEffect(() => {
     const unit=learningSession.unit;
-    if(mode!=="lesson" || unit.kind==="quiz" || !learningProgress.assists.autoOpenTerms || autoOpenedUnits.current.has(unit.id)) return;
+    if(!hydratedRef.current || learningSession.restored || mode!=="lesson" || unit.kind==="quiz" || !learningProgress.assists.autoOpenTerms || autoOpenedUnits.current.has(unit.id)) return;
     autoOpenedUnits.current.add(unit.id);
     const term=unit.terms.find(id=>!learningProgressRef.current.termStates[id]);
     if(term) openTerm(term);
@@ -225,10 +261,12 @@ export function useGoGame(audio: AudioPreferences) {
 
   useEffect(() => {
     let raw: string | null = null;
-    try { raw = localStorage.getItem(SAVE_KEY); } catch { /* Play without browser storage. */ }
+    let readFailed = false;
+    try { raw = localStorage.getItem(SAVE_KEY); } catch { readFailed = true; }
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
+      if (readFailed) setStorageUnavailable(true);
       const saved = raw ? decodeSave(raw) : null;
       setFirstVisit(!saved);
       if (raw) {
@@ -246,14 +284,25 @@ export function useGoGame(audio: AudioPreferences) {
             saved.game.size === 9 && saved.game.consecutivePasses >= 2 &&
             saved.learning.graduation.completedNineLineGame && saved.learning.graduation.enteredScoring &&
             isUnitUnlocked("s3-graduation", saved.learning);
+          difficultyRef.current=saved.difficulty;
           setDifficultyState(saved.difficulty);
           audio.restore(saved.volume, saved.category);
+          const resumed = restoreLessonResume(saved.lessonResume, saved.learning);
+          lessonResumeRef.current = resumed ? createLessonResume(resumed) : null;
+          if (saved.lastView === "lesson" && resumed) {
+            // Suppress all automatic term actions from restoration, including later renders.
+            autoOpenedUnits.current.add(resumed.unitId);
+            learningSession.restoreSession(resumed);
+            setMode("lesson");
+          }
         } else {
           try { localStorage.removeItem(SAVE_KEY); } catch { /* A bad save cannot block a fresh lesson. */ }
           toast.info("旧棋局无法恢复，已为你新开一局");
         }
       }
+      if (!saved) lessonResumeRef.current = createLessonResume(learningSession.getSession());
       hydratedRef.current = true;
+      setHydrated(true);
     });
     return () => { active = false; };
     // The restore callbacks are stable; hydration must only run once.
@@ -261,21 +310,10 @@ export function useGoGame(audio: AudioPreferences) {
   }, []);
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    try { localStorage.setItem(
-      SAVE_KEY,
-      encodeSave({
-        game: matchState,
-        confirmMoves,
-        learning: learningProgress,
-        difficulty,
-        volume: audio.volume,
-        category: audio.category,
-        scoring: { phase: scorePhase, deadStones: [...deadStones], outcome,
-          graduationEligible: graduationEligibleRef.current },
-      }),
-    ); } catch { /* Keep the current game usable without persistence. */ }
-  }, [audio.category, audio.volume, difficulty, learningProgress, matchState, scorePhase, deadStones, outcome, confirmMoves]);
+    persist();
+    // persist reads synchronous refs; these dependencies describe persistent state only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, audio.category, audio.volume, difficulty, learningProgress, matchState, scorePhase, deadStones, outcome, confirmMoves, learningSession.session, mode]);
 
   useEffect(() => () => workerRef.current?.terminate(), []);
 
@@ -321,7 +359,7 @@ export function useGoGame(audio: AudioPreferences) {
         }
       }
     },
-    [difficulty, setMode, recordExplanation, setMatchState, setScorePhase, setOutcome, awardGraduationEvent],
+    [difficulty, setMode, recordExplanation, setMatchState, setDeadStones, setScorePhase, setOutcome, awardGraduationEvent],
   );
 
   const play = useCallback(
@@ -408,7 +446,7 @@ export function useGoGame(audio: AudioPreferences) {
     setScorePhase("dead-stones");
     graduationEligibleRef.current = false;
     setMode("play");
-  }, [setMode,cancelExplanationSpeech,setMatchState,setScorePhase,setOutcome,clearPreview,clearReview]);
+  }, [setMode,cancelExplanationSpeech,setMatchState,setDeadStones,setScorePhase,setOutcome,clearPreview,clearReview]);
 
   const newGame = useCallback(() => {
     resetMatch(matchStateRef.current.size);
@@ -432,7 +470,9 @@ export function useGoGame(audio: AudioPreferences) {
   }, [setMode,setScorePhase,setOutcome,clearPreview]);
 
   const startUnit = useCallback((id: LessonUnitId) => {
-    if (!learningSession.startUnit(id)) return false;
+    const resumed = lessonResumeRef.current?.unitId === id ? restoreLessonResume(lessonResumeRef.current, learningProgressRef.current) : null;
+    if (!(resumed ? learningSession.restoreSession(resumed) : learningSession.startUnit(id))) return false;
+    if (resumed) autoOpenedUnits.current.add(id);
     clearPreview();clearReview();setPracticeOpen(false);
     setMoveExplanation("");
     cancelExplanationSpeech();
@@ -444,6 +484,11 @@ export function useGoGame(audio: AudioPreferences) {
     setMode("lesson");
     return true;
   }, [learningSession, setMode,cancelExplanationSpeech,clearPreview,clearReview]);
+
+  const continueLearning = () => {
+    const resumed = restoreLessonResume(lessonResumeRef.current,learningProgressRef.current);
+    return startUnit(resumed?.unitId ?? getRecommendedUnit(learningProgressRef.current) ?? "s3-graduation");
+  };
 
   const startPlay = useCallback(() => {
     if (actionGeneration !== generationRef.current) return;
@@ -471,6 +516,7 @@ export function useGoGame(audio: AudioPreferences) {
   }, [finishAiTurn, matchState, mode]);
 
   const setDifficulty = useCallback((value: Difficulty) => {
+    difficultyRef.current=value;
     setDifficultyState(value);
   }, []);
 
@@ -489,7 +535,7 @@ export function useGoGame(audio: AudioPreferences) {
       }
       return updated;
     });
-  }, []);
+  }, [setDeadStones]);
 
   const confirmDeadStones = useCallback(() => {
     if (reviewRef.current || modeRef.current !== "scoring" || scorePhaseRef.current !== "dead-stones" || matchStateRef.current.consecutivePasses < 2) return false;
@@ -506,8 +552,7 @@ export function useGoGame(audio: AudioPreferences) {
 
   const setConfirmMoves = (value:boolean) => {
     confirmMovesRef.current=value;setConfirmMovesState(value);clearPreview();
-    if(hydratedRef.current) { try { localStorage.setItem(SAVE_KEY,encodeSave({game:matchStateRef.current,learning:learningProgressRef.current,difficulty,volume:audio.volume,category:audio.category,confirmMoves:value,
-      scoring:{phase:scorePhaseRef.current,deadStones:[...deadStones],outcome:outcomeRef.current,graduationEligible:graduationEligibleRef.current}})); } catch { /* Confirmation remains available in memory. */ } }
+    persist();
   };
   const selectPoint = async (point:Point):Promise<MoveResult> => {
     if(reviewRef.current || actionGeneration !== generationRef.current || mode !== modeRef.current || busyRef.current) return {ok:false,reason:"finished"};
@@ -555,7 +600,7 @@ export function useGoGame(audio: AudioPreferences) {
     learningSession.session.feedbackExerciseId === learningSession.session.exercise?.id && failurePoint &&
     isPointOnBoard(failurePoint, learningSession.state.size) ? failurePoint : null;
   return {
-    firstVisit, attemptedPoint,
+    firstVisit, attemptedPoint, storageUnavailable,
     coachRound: mode === "play" && !review && learningProgress.assists.explainMoves ? getCoachRound(matchState) : [],
     confirmMoves,setConfirmMoves,previewPoint:previewValid ? preview.point : null,selectPoint,confirmMove,cancelMove:clearPreview,
     reviewing:!!review,reviewIndex:review?.index ?? 0,reviewTotal:review?.source.past.length ?? matchState.past.length,
@@ -589,6 +634,7 @@ export function useGoGame(audio: AudioPreferences) {
     newGame,
     startNewGame,
     startUnit,
+    continueLearning,
     startPlay,
     setDifficulty,
     toggleDeadStone,

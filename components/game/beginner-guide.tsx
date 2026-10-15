@@ -32,7 +32,7 @@ export function BeginnerGuide({ firstVisit, quizActive, onContinueLearning, show
     {open ? <div className="beginner-guide-content">
       <h2>先认识棋盘，再试着落子</h2>
       <p>棋子放在线的交叉点上。黑棋先走，之后双方轮流下；先学小棋盘，再下一盘 9 路棋。</p>
-      <p>课程未完成时，继续学习会从本课第一题开始。</p>
+      <p>普通课可续学；测验重开从第一题开始。</p>
       <button type="button" className="dictionary-button" data-action="dismiss-guide" onClick={close}>知道了，开始落子</button>
     </div> : null}
   </section>;

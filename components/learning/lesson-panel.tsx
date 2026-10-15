@@ -11,6 +11,7 @@ type LessonPanelProps = {
     graduated?: boolean;
     onStartGraduation?(): void;
     onOpenTerm?(id:TermId):void;
+    storageUnavailable?: boolean;
 };
 /** Focus the current roving point, never a lesson's expected answer. */
 export function focusLessonBoard() {
@@ -47,11 +48,13 @@ export function LessonTask({ learning, onStartGraduation, graduated=false }: Les
     </>}
   </section>;
 }
-export function LessonDetails({ learning, onOpenTerm=()=>{} }: LessonPanelProps) {
+export function LessonDetails({ learning, onOpenTerm=()=>{}, storageUnavailable=false }: LessonPanelProps) {
     const {unit,session,visibleHints}=learning;
     const quiz=unit.kind === "quiz";
     return <details className="panel lesson-card academy-details" open={quiz || undefined}>
-      <summary>讲解与提示{!quiz && !session.completed ? ` · 已展开 ${session.hintLevel} / 3 级提示` : ""}</summary>
+      <summary>讲解与提示{!quiz && !session.completed ? ` · 已展开 ${session.hintLevel} / 3 级提示` : ""}{learning.restored && !session.completed ? " · 已恢复本课进度" : ""}{storageUnavailable ? " · 无法保存进度" : ""}</summary>
+      {storageUnavailable ? <p role="status">无法保存进度：浏览器存储不可用，刷新后可能丢失本次位置。</p> : null}
+      {quiz ? <p>阶段测验重新进入时从第一题开始；独立作答，完成前不开放提示。</p> : null}
       <div className="lesson-story-row"><div className="lesson-guide" aria-hidden="true"><Image src="/qitong.webp" alt="" width={82} height={82}/></div><p className="lesson-story">{unit.story}</p></div>
       <div className="lesson-terms"><h3>本课术语</h3><div className="term-links">{unit.terms.map(id=><TermLink key={id} entry={GLOSSARY_BY_ID.get(id)!} onOpen={onOpenTerm} disabled={quiz && !session.completed}/>)}</div>{quiz && !session.completed ? <p>完成测验后查词</p> : null}</div>
       {unit.kind !== "graduation" ? <>

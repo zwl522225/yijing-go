@@ -5,6 +5,8 @@ import { decodeSave, encodeSave, getLegacyCompletedLessons, recordLegacyLessonCo
 import { DEFAULT_ASSISTS, DEFAULT_PROGRESS, isGraduated, getRecommendedUnit } from "@/lib/learning/progress";
 import { LESSON_UNIT_IDS } from "@/lib/learning/types";
 import type { GameSnapshot, GameState } from "@/lib/go/types";
+import { createLearningSession, submitLearningAction } from "@/hooks/use-learning-session";
+import { createLessonResume } from "@/lib/learning/session-resume";
 
 function settings(game: GameState) {
   return { game, difficulty: "beginner" as const, volume: 0.35, category: "instrumental" as const };
@@ -21,6 +23,46 @@ function legacyBoard(game: GameState) {
 }
 
 describe("save format", () => {
+  it("round trips valid ordinary lesson resume independently of the match", () => {
+    const first = createLearningSession("s1-intersections-turns");
+    const lessonResume = createLessonResume(submitLearningAction(first, first.exercise!.expected))!;
+    const saved = { ...settings(createGame({ size: 9 })), learning: DEFAULT_PROGRESS, lessonResume, lastView: "lesson" as const };
+    expect(decodeSave(encodeSave(saved))).toEqual({ ...saved, confirmMoves: false });
+    expect(decodeSave(encodeSave({ ...saved, lastView: "play" }))?.lastView).toBe("play");
+  });
+
+  it("drops broken resume fields without losing valid match, settings, or progress", () => {
+    const first = createLearningSession("s1-intersections-turns");
+    const lessonResume = createLessonResume(first)!;
+    const saved = { ...settings(createGame({ size: 9 })), learning: DEFAULT_PROGRESS, lessonResume: { ...lessonResume, signature: "old" }, lastView: "lesson" };
+    const restored = decodeSave(JSON.stringify({ version: 3, data: saved }))!;
+    expect(restored).toEqual({ ...settings(saved.game), learning: DEFAULT_PROGRESS, confirmMoves: false });
+    expect(restored).not.toHaveProperty("lessonResume");
+    expect(restored).not.toHaveProperty("lastView");
+  });
+
+  it("validates resume against sanitized learning and coerces only strict lesson view", () => {
+    const first = createLearningSession("s1-intersections-turns");
+    const saved = { ...settings(createGame({ size: 7 })), learning: { ...DEFAULT_PROGRESS, assists: "bad" }, lessonResume: createLessonResume(first) };
+    for (const lastView of [undefined, null, true, "play", ["lesson"], "unknown"]) {
+      const restored = decodeSave(JSON.stringify({ version: 3, data: { ...saved, lastView } }))!;
+      expect(restored.lessonResume).toEqual(saved.lessonResume);
+      expect(restored.lastView).toBe("play");
+      expect(restored.learning).toEqual(DEFAULT_PROGRESS);
+    }
+    const locked = { ...saved, lessonResume: createLessonResume(createLearningSession("s2-connect-cut")), learning: { ...DEFAULT_PROGRESS, bestQuizScores: { "stage-1": "100" }, completedUnitIds: ["s1-checkpoint"] } };
+    expect(decodeSave(JSON.stringify({ version: 3, data: locked }))).not.toHaveProperty("lessonResume");
+  });
+
+  it("keeps old saves free of absent resume fields", () => {
+    const saved = { ...settings(createGame({ size: 9 })), learning: DEFAULT_PROGRESS };
+    const encoded = encodeSave(saved);
+    expect(JSON.parse(encoded).data).not.toHaveProperty("lessonResume");
+    expect(JSON.parse(encoded).data).not.toHaveProperty("lastView");
+    expect(decodeSave(encoded)).not.toHaveProperty("lessonResume");
+    expect(decodeSave(encoded)).not.toHaveProperty("lastView");
+  });
+
   it("ignores a saved graduation unit mark without real graduation flags",()=>{
     const learning={...DEFAULT_PROGRESS,completedUnitIds:[...LESSON_UNIT_IDS],bestQuizScores:{"stage-1":80,"stage-2":80}};
     const restored=decodeSave(encodeSave({...settings(createGame({size:9})),learning}))!;

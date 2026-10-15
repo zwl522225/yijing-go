@@ -95,9 +95,11 @@ describe("glossary lifecycle and persistence",()=>{
     render();await Promise.resolve();let game=render();game.setLearningAssist("explainMoves",true);game=render();
     await game.play({x:2,y:2});game=render();expect(game.moveExplanation).toContain("（3，3）");
     game.startUnit("s1-intersections-turns");game=render();expect(game.moveExplanation).toBe("");
+    expect(game.learningSession.session.exerciseIndex).toBe(1);
+    game.learningSession.resetUnit();game=render();
     await game.play({x:2,y:2});game=render();expect(game.moveExplanation).toContain("（3，3）");
     game.startPlay();game=render();expect(game.moveExplanation).toBe("");
-    game.startUnit("s1-intersections-turns");game=render();await game.play({x:2,y:2});game=render();
+    game.startUnit("s1-intersections-turns");game=render();game.learningSession.resetUnit();game=render();await game.play({x:2,y:2});game=render();
     game.setLearningAssist("explainMoves",false);game=render();await game.play({x:0,y:2});game=render();
     game.setLearningAssist("explainMoves",true);game=render();expect(game.moveExplanation).toBe("");
   });

@@ -6,6 +6,7 @@ import { createDefaultProgress, DEFAULT_ASSISTS, DEFAULT_GRADUATION, isGraduated
 import type { GraduationProgress, LearningAssists, LearningProgress } from "@/lib/learning/progress";
 import { LESSON_UNIT_IDS, TERM_IDS } from "@/lib/learning/types";
 import type { LessonUnitId, StageId, TermId, TermStatus } from "@/lib/learning/types";
+import { createLessonResume, restoreLessonResume, type LessonResume } from "@/lib/learning/session-resume";
 
 const SAVE_VERSION = 3;
 // Retained solely for reading historical saves created by the original six lessons.
@@ -22,6 +23,8 @@ export type SaveData = {
   category: SoundscapeCategory;
   scoring?: ScoringSave;
   confirmMoves?: boolean;
+  lessonResume?: LessonResume;
+  lastView?: "lesson" | "play";
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -218,14 +221,18 @@ function migrateVersion2(value: unknown): SaveData | null {
 
 function decodeVersion3(value: unknown): SaveData | null {
   if (!isCurrentGameAndSettings(value)) return null;
+  const learning = sanitizeLearning(value.learning);
+  const resumedSession = restoreLessonResume(value.lessonResume, learning);
+  const lessonResume = resumedSession ? createLessonResume(resumedSession) : null;
   return {
     game: value.game,
     difficulty: value.difficulty,
     volume: value.volume,
     category: value.category,
-    learning: sanitizeLearning(value.learning),
+    learning,
     confirmMoves: value.confirmMoves === true,
     ...(isObject(value.scoring) ? { scoring: sanitizeScoring(value.scoring, value.game) } : {}),
+    ...(lessonResume ? { lessonResume, lastView: value.lastView === "lesson" ? "lesson" : "play" } : {}),
   };
 }
 
@@ -243,8 +250,8 @@ function sanitizeScoring(value: Record<string, unknown>, game: GameState): Scori
 }
 
 export function encodeSave(data: SaveData): string {
-  const { game, learning, difficulty, volume, category, scoring, confirmMoves } = data;
-  return JSON.stringify({ version: SAVE_VERSION, data: { game, learning, difficulty, volume, category, confirmMoves: confirmMoves === true, ...(scoring ? {scoring} : {}) } });
+  const { game, learning, difficulty, volume, category, scoring, confirmMoves, lessonResume, lastView } = data;
+  return JSON.stringify({ version: SAVE_VERSION, data: { game, learning, difficulty, volume, category, confirmMoves: confirmMoves === true, ...(scoring ? {scoring} : {}), ...(lessonResume ? { lessonResume, ...(lastView ? { lastView } : {}) } : {}) } });
 }
 
 export function decodeSave(raw: string): SaveData | null {

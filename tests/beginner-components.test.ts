@@ -15,9 +15,16 @@ afterEach(()=>vi.unstubAllGlobals());
 const markup = renderToStaticMarkup;
 function controller(): LearningSessionController {
   const session=createLearningSession("s1-intersections-turns");
-  return {session,getSession:()=>session,unit:CURRICULUM_BY_ID.get(session.unitId)!,state:session.state,feedback:null,visibleHints:session.exercise!.hints.slice(0,session.hintLevel),selectedDeadStone:null,startUnit:vi.fn(),isQuizActive:vi.fn(),reportRejectedMove:vi.fn(),submitMove:vi.fn(),submitPass:vi.fn(),submitGroup:vi.fn(),submitDeadStone:vi.fn(),selectDeadStone:vi.fn(),submitChoice:vi.fn(),requestHint:vi.fn(),retryExercise:vi.fn(),undoExercise:vi.fn(),resetUnit:vi.fn()};
+  return {session,getSession:()=>session,restored:false,restoreSession:vi.fn(),unit:CURRICULUM_BY_ID.get(session.unitId)!,state:session.state,feedback:null,visibleHints:session.exercise!.hints.slice(0,session.hintLevel),selectedDeadStone:null,startUnit:vi.fn(),isQuizActive:vi.fn(),reportRejectedMove:vi.fn(),submitMove:vi.fn(),submitPass:vi.fn(),submitGroup:vi.fn(),submitDeadStone:vi.fn(),selectDeadStone:vi.fn(),submitChoice:vi.fn(),requestHint:vi.fn(),retryExercise:vi.fn(),undoExercise:vi.fn(),resetUnit:vi.fn()};
 }
 describe("compact beginner presentation",()=>{
+  it("keeps resume and storage status in lesson details and explains quiz restarts",()=>{
+    const learning=controller();learning.restored=true;
+    const task=markup(createElement(LessonTask,{learning}));const details=markup(createElement(LessonDetails,{learning,storageUnavailable:true}));
+    expect(details).toContain("已恢复本课进度");expect(details).toContain("无法保存进度");expect(task).not.toContain("已恢复本课进度");
+    const session=createLearningSession("s1-checkpoint");learning.session=session;learning.unit=CURRICULUM_BY_ID.get(session.unitId)!;learning.restored=false;
+    expect(markup(createElement(LessonDetails,{learning}))).toContain("阶段测验重新进入时从第一题开始");
+  });
   it("focuses the existing roving point and scrolls without making a move, respecting reduced motion",()=>{
     const focus=vi.fn(), scrollIntoView=vi.fn(), pointQuery=vi.fn(()=>({focus}));
     const board={querySelector:pointQuery,scrollIntoView};const query=vi.fn(()=>board);
