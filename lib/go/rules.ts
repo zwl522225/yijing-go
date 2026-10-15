@@ -170,7 +170,9 @@ export function passTurn(state: GameState): GameState {
 }
 
 export function undoRound(state: GameState): GameState {
-  const steps = Math.min(2, state.past.length);
+  // The human plays black. Before White replies, only Black's pending move
+  // belongs to the current round; keep the preceding completed round intact.
+  const steps = Math.min(state.toPlay === "white" ? 1 : 2, state.past.length);
   if (steps === 0) return state;
 
   const restored = state.past[state.past.length - steps];

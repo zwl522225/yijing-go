@@ -98,7 +98,7 @@ export function ControlPanel({ game }: ControlPanelProps) {
                 <RotateCcw />悔一回合
               </Button>
             </TooltipTrigger>
-            <TooltipContent>撤回你和电脑最近的一轮</TooltipContent>
+            <TooltipContent>电脑还未落子时，只撤回你刚下的一手；已经应手时，撤回你和电脑最近的一轮。</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>

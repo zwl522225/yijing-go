@@ -38,6 +38,45 @@ function nodes(node: unknown): ReactElement<Record<string, unknown>>[] {
   return [element,...nodes(element.props?.children)];
 }
 describe("beginner lifecycle",()=>{
+  it("preserves the last completed round when undoing during AI thinking and ignores its late reply", async () => {
+    const replies: (() => void)[] = [];
+    class DelayedWorker {
+      onmessage: ((event: {data: {id: number; move: {x: number; y: number}}}) => void) | null = null;
+      onerror: unknown;
+      terminate() {}
+      postMessage(request: {id: number}) {
+        const move = replies.length === 0 ? {x: 6, y: 6} : {x: 5, y: 6};
+        replies.push(() => this.onmessage?.({data: {id: request.id, move}}));
+      }
+    }
+    vi.stubGlobal("Worker", DelayedWorker);
+    render(); await Promise.resolve(); let game = render();
+    game.startNewGame(9); game = render();
+    await game.play({x: 2, y: 2}); replies[0](); await vi.runAllTimersAsync(); game = render();
+    expect(game.matchState.moves).toHaveLength(2);
+    const completedRound = game.matchState;
+    const progress = game.learningProgress;
+
+    await game.play({x: 3, y: 2}); game = render();
+    expect(game.aiThinking).toBe(true);
+    game.undo(); game = render();
+    expect(game.matchState).toEqual(completedRound);
+    expect(game.matchState.toPlay).toBe("black");
+    expect(game.aiThinking).toBe(false);
+    expect(game.learningProgress).toBe(progress);
+    expect(JSON.parse(storage.get(SAVE_KEY)!).data.game).toEqual(completedRound);
+
+    replies[1](); await vi.runAllTimersAsync(); game = render();
+    expect(game.matchState).toEqual(completedRound);
+    expect(replies).toHaveLength(2);
+    expect(game.aiThinking).toBe(false);
+    expect((await game.play({x: 3, y: 2})).ok).toBe(true);
+    replies[2](); await vi.runAllTimersAsync(); game = render();
+    expect(game.matchState.moves).toHaveLength(4);
+    game.undo(); game = render(); expect(game.matchState).toEqual(completedRound);
+    game.undo(); game = render(); expect(game.matchState).toEqual(createGame({size: 9}));
+  });
+
   it("replaces stale feedback for a rejected ordinary lesson preview without submitting an answer",async()=>{
     const speak=vi.fn(),cancel=vi.fn();
     vi.stubGlobal("window",{speechSynthesis:{speak,cancel}});

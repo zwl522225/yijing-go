@@ -193,4 +193,35 @@ describe("playMove", () => {
     expect(moves).not.toContainEqual({ x: 3, y: 3 });
     expect(moves).toContainEqual({ x: 4, y: 4 });
   });
+
+  it("undoes only the pending human move while preserving the preceding completed round", () => {
+    const first = playMove(createGame({ size: 9 }), { x: 2, y: 2 });
+    if (!first.ok) throw new Error("First black move must be legal");
+    const reply = playMove(first.state, { x: 6, y: 6 });
+    if (!reply.ok) throw new Error("White reply must be legal");
+    const pending = playMove(reply.state, { x: 3, y: 2 });
+    if (!pending.ok) throw new Error("Pending black move must be legal");
+
+    expect(undoRound(pending.state)).toEqual(reply.state);
+    expect(undoRound(pending.state).toPlay).toBe("black");
+    expect(undoRound(undoRound(pending.state))).toEqual(createGame({ size: 9 }));
+  });
+
+  it("restores captured stones and the real history when undoing a pending capture", () => {
+    const initial = createGame({ size: 5, stones: [
+      ["white", 1, 1], ["black", 0, 1], ["black", 1, 0], ["black", 2, 1],
+    ] });
+    const first = playMove(initial, { x: 4, y: 4 });
+    if (!first.ok) throw new Error("First black move must be legal");
+    const reply = passTurn(first.state);
+    const captured = playMove(reply, { x: 1, y: 2 });
+    if (!captured.ok) throw new Error("Capture must be legal");
+    expect(captured.state.captures.black).toBe(1);
+
+    const restored = undoRound(captured.state);
+    expect(restored).toEqual(reply);
+    expect(restored.board[1][1]).toBe("white");
+    expect(restored.captures.black).toBe(0);
+    expect(playMove(restored, { x: 1, y: 2 })).toEqual(captured);
+  });
 });
