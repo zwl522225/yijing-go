@@ -340,6 +340,16 @@ button:focus-visible, a:focus-visible {
 .pass-explanation { margin: 10px 0 0; color: #665e52; font-size: 12px; line-height: 1.7; }
 .site-footer { flex-wrap: wrap; }
 .site-footer .feedback-entry { margin-left: auto; }
+.backup-entry-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.backup-entry-group span { max-width: 100%; overflow-wrap: anywhere; }
+.learning-backup-dialog { width: calc(100% - 32px); max-width: 560px !important; max-height: calc(100dvh - 32px); overflow-y: auto; overflow-wrap: anywhere; border-color: #b9a78e; background: #f7efe2; color: #302e28; }
+.learning-backup-dialog > *, .backup-file-field, .backup-preview { min-width: 0; }
+.backup-file-field { display: grid; gap: 8px; }
+.backup-file-field input { max-width: 100%; font-size: 14px; }
+.backup-preview { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px; border: 1px solid #cbbb9e; border-radius: 8px; background: #fff9ed; }
+.backup-preview p { width: 100%; margin: 0; font-size: 14px; line-height: 1.6; }
+.backup-preview button { height: auto; min-height: 36px; max-width: 100%; white-space: normal; }
+.backup-warning { color: #87432e; }
 .feedback-entry { min-height: 36px; }
 .feedback-dialog { z-index: 60; width: calc(100% - 32px); max-width: 560px !important; max-height: calc(100dvh - 32px); overflow-y: auto; border-color: #b9a78e; background: #f7efe2; color: #302e28; }
 .feedback-dialog [data-slot="dialog-header"] { padding-right: 20px; }

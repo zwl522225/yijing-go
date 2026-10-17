@@ -14,6 +14,7 @@ import { LearningAssistPanel } from "@/components/learning/learning-assist-panel
 import { PracticeDialog } from "@/components/learning/practice-picker";
 import { ReviewPanel } from "@/components/game/review-panel";
 import { GlossaryDialog } from "@/components/learning/glossary-dialog";
+import { LearningBackupDialog } from "@/components/learning/learning-backup-dialog";
 import { isGraduated } from "@/lib/learning/progress";
 import { BeginnerGuide } from "@/components/game/beginner-guide";
 import { CoachPanel } from "@/components/game/coach-panel";
@@ -34,6 +35,12 @@ export function GameApp() {
   });
   useWebMcp(game, soundscape);
   const [feedback, setFeedback] = useState<{ context: FeedbackContext; opener: HTMLButtonElement } | null>(null);
+  const [backupOpener,setBackupOpener] = useState<HTMLButtonElement | null>(null);
+  function openLearningBackup(event: MouseEvent<HTMLButtonElement>) {
+    if (game.backupBlockedReason) return;
+    game.cancelLearningRestore();game.closeGlossary();game.closePractice();
+    setBackupOpener(event.currentTarget);
+  }
   function openFeedback(event: MouseEvent<HTMLButtonElement>) {
     const mode = game.reviewing ? "review" : game.glossaryBlocked ? "quiz" : game.mode;
     const context: FeedbackContext = { mode, boardSize: game.state.size };
@@ -127,7 +134,10 @@ export function GameApp() {
         </aside>
       </section>
 
-      <footer className="site-footer"><span className="seal">弈境</span><p>静心落子，慢慢变强。</p><button type="button" className="dictionary-button feedback-entry" data-action="open-feedback" onClick={openFeedback}>遇到困难？反馈一下</button></footer>
+      <footer className="site-footer"><span className="seal">弈境</span><p>静心落子，慢慢变强。</p>
+        <div className="backup-entry-group"><button type="button" className="dictionary-button" data-action="open-learning-backup" disabled={!!game.backupBlockedReason} aria-describedby={game.backupBlockedReason ? "learning-backup-blocked" : undefined} onClick={openLearningBackup}>备份学习进度</button>
+          {game.backupBlockedReason ? <span id="learning-backup-blocked">{game.backupBlockedReason}</span> : null}</div>
+        <button type="button" className="dictionary-button feedback-entry" data-action="open-feedback" onClick={openFeedback}>遇到困难？反馈一下</button></footer>
 
       <ResultDialog
         open={game.mode === "scoring" && !game.reviewing}
@@ -145,6 +155,7 @@ export function GameApp() {
         onFeedback={openFeedback}
       />
       {feedback ? <FeedbackDialog context={feedback.context} opener={feedback.opener} onClose={() => setFeedback(null)} /> : null}
+      {backupOpener ? <LearningBackupDialog game={game} opener={backupOpener} onClose={()=>setBackupOpener(null)}/> : null}
       <PracticeDialog open={game.practiceOpen} progress={game.learningProgress} onClose={game.closePractice}/>
       <Toaster position="top-center" />
       <GlossaryDialog open={game.glossaryOpen} termId={game.glossaryTermId} progress={game.learningProgress}

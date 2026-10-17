@@ -24,8 +24,21 @@ import { GLOSSARY_BY_ID } from "@/lib/learning/glossary";
 import { analyzeReview, type ReviewAnalysis } from "@/lib/go/review";
 import type { LearningSession } from "@/hooks/use-learning-session";
 import { CURRICULUM_BY_ID } from "@/lib/learning/curriculum";
+import { createLearningBackup, parseLearningBackup } from "@/lib/learning/backup";
+import { createLearningSession } from "@/lib/learning/session";
+import type { SaveData } from "@/lib/go/storage";
 
 export type GameMode = "play" | "lesson" | "scoring";
+
+function learningBackupBlockedReason(hydrated: boolean, reviewing: boolean, previewing: boolean, mode: GameMode, quizActive: boolean, computerTurn: boolean): string | null {
+  if (!hydrated) return "正在读取学习记录，请稍候。";
+  if (reviewing) return "请先退出逐手复盘。";
+  if (previewing) return "请先确认或取消待落子。";
+  if (mode === "scoring") return "请完成终局确认并返回新手学堂。";
+  if (mode === "lesson" && quizActive) return "请先完成当前测验。";
+  if (mode === "play" && computerTurn) return "请等待电脑回合结束。";
+  return null;
+}
 
 type AudioPreferences = {
   volume: number;
@@ -198,21 +211,82 @@ export function useGoGame(audio: AudioPreferences) {
   const actionGeneration = generationRef.current;
 
   // Every write, including immediate setting changes, uses the same live snapshot.
-  const persist = () => {
-    if (!hydratedRef.current) return;
+  const snapshot = (): SaveData => {
     const current = learningSession.getSession();
     const lessonResume = lessonResumeRef.current;
     const lastView = modeRef.current === "lesson" && !current.completed &&
       CURRICULUM_BY_ID.get(current.unitId)?.kind === "lesson" && lessonResume?.unitId === current.unitId ? "lesson" : "play";
-    try {
-      localStorage.setItem(SAVE_KEY, encodeSave({
+    return {
         game:matchStateRef.current,learning:learningProgressRef.current,difficulty:difficultyRef.current,
         volume:audioRef.current.volume,category:audioRef.current.category,confirmMoves:confirmMovesRef.current,
         ...(lessonResume ? {lessonResume} : {}),lastView,
         scoring:{phase:scorePhaseRef.current,deadStones:[...deadStonesRef.current],outcome:outcomeRef.current,
           graduationEligible:graduationEligibleRef.current},
-      }));
+      };
+  };
+  const persist = () => {
+    if (!hydratedRef.current) return;
+    try {
+      localStorage.setItem(SAVE_KEY, encodeSave(snapshot()));
     } catch { queueMicrotask(() => setStorageUnavailable(true)); }
+  };
+
+  type RestoreCandidate = { ticket: object; raw: string; progress: LearningProgress; session: LearningSession;
+    bookmark: LessonResume | null; mode: GameMode; generation: number };
+  const restoreCandidateRef = useRef<RestoreCandidate | null>(null);
+  const cancelLearningRestore = () => { restoreCandidateRef.current = null; };
+  const getBackupBlockedReason = () => learningBackupBlockedReason(hydratedRef.current,!!reviewRef.current,!!previewRef.current,
+    modeRef.current,learningSession.isQuizActive(),busyRef.current || matchStateRef.current.toPlay !== "black");
+  const exportLearningBackup = (): {ok:true;text:string}|{ok:false;error:string} => {
+    const error = getBackupBlockedReason();
+    if (error) return {ok:false,error};
+    try { return {ok:true,text:createLearningBackup(learningProgressRef.current,lessonResumeRef.current)}; }
+    catch { return {ok:false,error:"无法生成学习备份，请稍后重试。"}; }
+  };
+  const previewLearningBackup = (raw: string) => {
+    cancelLearningRestore();
+    const error = getBackupBlockedReason();
+    if (error) return {ok:false as const,error};
+    const parsed = parseLearningBackup(raw);
+    if (!parsed.ok) return parsed;
+    const ticket = Object.freeze({});
+    restoreCandidateRef.current = {ticket,raw:createLearningBackup({...parsed.data.learning,assists:learningProgressRef.current.assists},parsed.data.lessonResume,new Date(parsed.data.exportedAt)),
+      progress:learningProgressRef.current,session:learningSession.getSession(),bookmark:lessonResumeRef.current,mode:modeRef.current,generation:generationRef.current};
+    return {ok:true as const,ticket,summary:parsed.summary,warnings:parsed.warnings};
+  };
+  const confirmLearningRestore = (ticket: object): {ok:true}|{ok:false;error:string} => {
+    const candidate = restoreCandidateRef.current;
+    cancelLearningRestore();
+    const blocked = getBackupBlockedReason();
+    if (blocked) return {ok:false,error:blocked};
+    if (!candidate || ticket !== candidate.ticket || candidate.progress !== learningProgressRef.current ||
+      candidate.session !== learningSession.getSession() || candidate.bookmark !== lessonResumeRef.current ||
+      learningSession.session !== learningSession.getSession() ||
+      candidate.mode !== modeRef.current || candidate.generation !== generationRef.current || actionGeneration !== generationRef.current) {
+      return {ok:false,error:"学习状态已变化，请重新选择文件并预览。"};
+    }
+    const parsed = parseLearningBackup(candidate.raw);
+    if (!parsed.ok) return parsed;
+    const progress: LearningProgress = {...parsed.data.learning,assists:{...learningProgressRef.current.assists}};
+    const resumed = restoreLessonResume(parsed.data.lessonResume,progress);
+    const target = resumed ?? createLearningSession(getRecommendedUnit(progress) ?? "s3-graduation");
+    if (!isUnitUnlocked(target.unitId,progress)) return {ok:false,error:"续学课程不可用，请重新预览。"};
+    const bookmark = createLessonResume(target);
+    const save: SaveData = {...snapshot(),learning:progress,lessonResume:bookmark ?? undefined,
+      lastView:bookmark ? "lesson" : "play"};
+    try { localStorage.setItem(SAVE_KEY,encodeSave(save)); }
+    catch { setStorageUnavailable(true); return {ok:false,error:"当前浏览器无法保存，学习记录未替换。"}; }
+    // Everything below is synchronous and all inputs were validated before writing.
+    replaceLearningProgress(progress);
+    autoOpenedUnits.current.add(target.unitId);
+    if (bookmark) learningSession.restoreSession(target);
+    else learningSession.startUnit(target.unitId);
+    lessonResumeRef.current = bookmark;
+    generationRef.current += 1;
+    workerRef.current?.terminate();workerRef.current=null;busyRef.current=false;setAiThinking(false);
+    clearPreview();clearReview();setPracticeOpen(false);setGlossary({open:false,termId:null});
+    setMoveExplanation("");cancelExplanationSpeech();setMode("lesson");
+    return {ok:true};
   };
 
   const state = review ? review.index === review.source.past.length ? review.source :
@@ -282,10 +356,9 @@ export function useGoGame(audio: AudioPreferences) {
           setOutcome(saved.scoring?.outcome ?? null);
           setScorePhase(saved.scoring?.phase ?? "dead-stones");
           if (saved.scoring?.outcome) setMode("scoring");
+          // Match qualification survives learning replacement; awarding still checks current unlocks.
           graduationEligibleRef.current = saved.scoring?.graduationEligible === true &&
-            saved.game.size === 9 && saved.game.consecutivePasses >= 2 &&
-            saved.learning.graduation.completedNineLineGame && saved.learning.graduation.enteredScoring &&
-            isUnitUnlocked("s3-graduation", saved.learning);
+            saved.game.size === 9 && saved.game.consecutivePasses >= 2 && !saved.scoring?.outcome;
           difficultyRef.current=saved.difficulty;
           setDifficultyState(saved.difficulty);
           audio.restore(saved.volume, saved.category);
@@ -419,7 +492,7 @@ export function useGoGame(audio: AudioPreferences) {
   }, [actionGeneration, learningSession, finishAiTurn, mode,recordExplanation,setMatchState,clearPreview]);
 
   const undo = useCallback(() => {
-    if (reviewRef.current || modeRef.current !== "play") return;
+    if (actionGeneration !== generationRef.current || reviewRef.current || modeRef.current !== "play") return;
     clearPreview();
     setMoveExplanation("");
     cancelExplanationSpeech();
@@ -431,9 +504,10 @@ export function useGoGame(audio: AudioPreferences) {
     setMode("play");
     setOutcome(null);
     setMatchState((current) => undoRound(current));
-  }, [setMode,cancelExplanationSpeech,setMatchState,setOutcome,clearPreview]);
+  }, [actionGeneration,setMode,cancelExplanationSpeech,setMatchState,setOutcome,clearPreview]);
 
   const resetMatch = useCallback((size: BoardSize) => {
+    if (actionGeneration !== generationRef.current) return;
     clearPreview();clearReview();setPracticeOpen(false);
     setMoveExplanation("");
     cancelExplanationSpeech();
@@ -448,7 +522,7 @@ export function useGoGame(audio: AudioPreferences) {
     setScorePhase("dead-stones");
     graduationEligibleRef.current = false;
     setMode("play");
-  }, [setMode,cancelExplanationSpeech,setMatchState,setDeadStones,setScorePhase,setOutcome,clearPreview,clearReview]);
+  }, [actionGeneration,setMode,cancelExplanationSpeech,setMatchState,setDeadStones,setScorePhase,setOutcome,clearPreview,clearReview]);
 
   const newGame = useCallback(() => {
     resetMatch(matchStateRef.current.size);
@@ -459,7 +533,7 @@ export function useGoGame(audio: AudioPreferences) {
   }, [resetMatch]);
 
   const resign = useCallback(() => {
-    if (reviewRef.current || modeRef.current !== "play") return;
+    if (actionGeneration !== generationRef.current || reviewRef.current || modeRef.current !== "play") return;
     clearPreview();
     generationRef.current += 1;
     workerRef.current?.terminate();
@@ -469,9 +543,10 @@ export function useGoGame(audio: AudioPreferences) {
     graduationEligibleRef.current = false;
     setScorePhase("final");
     setMode("scoring");
-  }, [setMode,setScorePhase,setOutcome,clearPreview]);
+  }, [actionGeneration,setMode,setScorePhase,setOutcome,clearPreview]);
 
   const startUnit = useCallback((id: LessonUnitId) => {
+    if (actionGeneration !== generationRef.current) return false;
     const resumed = lessonResumeRef.current?.unitId === id ? restoreLessonResume(lessonResumeRef.current, learningProgressRef.current) : null;
     if (!(resumed ? learningSession.restoreSession(resumed) : learningSession.startUnit(id))) return false;
     if (resumed) autoOpenedUnits.current.add(id);
@@ -485,7 +560,7 @@ export function useGoGame(audio: AudioPreferences) {
     setAiThinking(false);
     setMode("lesson");
     return true;
-  }, [learningSession, setMode,cancelExplanationSpeech,clearPreview,clearReview]);
+  }, [actionGeneration,learningSession, setMode,cancelExplanationSpeech,clearPreview,clearReview]);
 
   const continueLearning = () => {
     const resumed = restoreLessonResume(lessonResumeRef.current,learningProgressRef.current);
@@ -540,17 +615,17 @@ export function useGoGame(audio: AudioPreferences) {
   }, [setDeadStones]);
 
   const confirmDeadStones = useCallback(() => {
-    if (reviewRef.current || modeRef.current !== "scoring" || scorePhaseRef.current !== "dead-stones" || matchStateRef.current.consecutivePasses < 2) return false;
+    if (actionGeneration !== generationRef.current || reviewRef.current || modeRef.current !== "scoring" || scorePhaseRef.current !== "dead-stones" || matchStateRef.current.consecutivePasses < 2) return false;
     setScorePhase("score-review");
     awardGraduationEvent("confirmedDeadStones");
     return true;
-  }, [setScorePhase,awardGraduationEvent]);
+  }, [actionGeneration,setScorePhase,awardGraduationEvent]);
   const confirmFinalScore = useCallback(() => {
-    if (reviewRef.current || modeRef.current !== "scoring" || scorePhaseRef.current !== "score-review" || matchStateRef.current.consecutivePasses < 2) return false;
+    if (actionGeneration !== generationRef.current || reviewRef.current || modeRef.current !== "scoring" || scorePhaseRef.current !== "score-review" || matchStateRef.current.consecutivePasses < 2) return false;
     setScorePhase("final");
     awardGraduationEvent("finalizedScore");
     return true;
-  }, [setScorePhase,awardGraduationEvent]);
+  }, [actionGeneration,setScorePhase,awardGraduationEvent]);
 
   const setConfirmMoves = (value:boolean) => {
     confirmMovesRef.current=value;setConfirmMovesState(value);clearPreview();
@@ -603,6 +678,8 @@ export function useGoGame(audio: AudioPreferences) {
     learningSession.session.feedbackExerciseId === learningSession.session.exercise?.id && failurePoint &&
     isPointOnBoard(failurePoint, learningSession.state.size) ? failurePoint : null;
   return {
+    backupBlockedReason:learningBackupBlockedReason(hydrated,!!review,!!preview,mode,glossaryBlocked,aiThinking || matchState.toPlay !== "black"),
+    exportLearningBackup,previewLearningBackup,confirmLearningRestore,cancelLearningRestore,
     firstVisit, attemptedPoint, storageUnavailable,
     coachRound: mode === "play" && !review && learningProgress.assists.explainMoves ? getCoachRound(matchState) : [],
     confirmMoves,setConfirmMoves,previewPoint:previewValid ? preview.point : null,selectPoint,confirmMove,cancelMove:clearPreview,
