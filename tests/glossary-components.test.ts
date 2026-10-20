@@ -11,6 +11,7 @@ const host = vi.hoisted(() => ({values: [] as unknown[], cursor: 0}));
 vi.mock("react", async original => ({...await original<typeof import("react")>(),
   useState: (initial: unknown) => {const i=host.cursor++; if(!(i in host.values)) host.values[i]=typeof initial === "function" ? (initial as () => unknown)() : initial;
     return [host.values[i], (next: unknown) => {host.values[i]=typeof next === "function" ? (next as (value: unknown)=>unknown)(host.values[i]) : next;}];},
+  useRef: (initial: unknown) => {const i=host.cursor++; return host.values[i] ?? (host.values[i]={current:initial});},
   useEffect: () => {},
 }));
 function render<T>(fn:()=>T) {host.cursor=0; return fn();}

@@ -7,7 +7,7 @@ import { CURRICULUM } from "@/lib/learning/curriculum";
 import { createDefaultProgress } from "@/lib/learning/progress";
 import { LESSON_UNIT_IDS } from "@/lib/learning/types";
 const host=vi.hoisted(()=>({values:[] as unknown[],cursor:0}));
-vi.mock("react",async original=>({...await original<typeof import("react")>(),useState(initial:unknown){const i=host.cursor++;if(!(i in host.values))host.values[i]=typeof initial==="function"?(initial as ()=>unknown)():initial;return [host.values[i],(next:unknown)=>{host.values[i]=typeof next==="function"?(next as (v:unknown)=>unknown)(host.values[i]):next;}];},useEffect(){}}));
+vi.mock("react",async original=>({...await original<typeof import("react")>(),useState(initial:unknown){const i=host.cursor++;if(!(i in host.values))host.values[i]=typeof initial==="function"?(initial as ()=>unknown)():initial;return [host.values[i],(next:unknown)=>{host.values[i]=typeof next==="function"?(next as (v:unknown)=>unknown)(host.values[i]):next;}];},useRef(initial:unknown){const i=host.cursor++;return host.values[i]??(host.values[i]={current:initial});},useEffect(){}}));
 function render<T>(fn:()=>T){host.cursor=0;return fn();}
 function elements(node:ReactNode):ReactElement<Record<string,unknown>>[]{if(Array.isArray(node))return node.flatMap(elements);if(!node||typeof node!=="object")return [];const e=node as ReactElement<Record<string,unknown>>;return [e,...elements(e.props?.children as ReactNode)];}
 function click(tree:ReactNode,key:string,value:unknown){const button=elements(tree).find(e=>e.props[key]===value)!;expect(button).toBeDefined();(button.props.onClick as ()=>void)();}

@@ -502,6 +502,21 @@ button:focus-visible, a:focus-visible {
 .review-moments strong { display: block; font-size: 13px; margin-top: 8px; }
 .review-entry { align-self: start; }
 .practice-dialog .practice-board { max-width: 340px; }
+.practice-round { min-width: 0; margin: 14px 0; }
+.practice-round h2 { margin: 10px 0; color: #314936; font-size: 18px; font-weight: 700; line-height: 1.65; }
+.practice-round h2:focus { outline: 2px solid #97674b; outline-offset: 4px; }
+.practice-round p { margin: 8px 0; font-size: 14px; line-height: 1.8; }
+.practice-round .practice-round-count { color: #314936; font-size: 18px; font-weight: 700; }
+.practice-round-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.practice-round-actions button { max-width: 100%; white-space: normal; }
+.practice-round-actions button:first-child:not(:disabled) { color: #fff; background: #476148; border-color: #476148; }
+.practice-round-results { display: grid; gap: 10px; padding: 0; margin: 16px 0; list-style: none; }
+.practice-round-results li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 12px; border: 1px solid #d4c6af; border-radius: 8px; background: #fffaf0; font-size: 13px; }
+.practice-round-results li > span:first-child { flex-basis: 100%; }
+.practice-round-results strong { color: #476148; }
+.practice-round-results li[data-status="unfinished"] strong { color: #74675d; }
+.practice-round-results li > span:last-child { color: #74675d; }
+.practice-round-results small { flex-basis: 100%; color: #74675d; }
 @media (max-width: 600px) { .header-stats { flex-wrap: wrap; } .review-controls button { flex: 1 1 40%; } .practice-topics button { font-size: 12px; padding: 7px 9px; } }
 
 /* The current task leads to the board; lesson detail stays beside it on desktop. */
