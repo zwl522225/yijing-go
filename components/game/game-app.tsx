@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { FeedbackDialog } from "@/components/game/feedback-dialog";
 import { createFeedbackReport, type FeedbackContext } from "@/lib/learning/feedback-report";
 import { ControlPanel } from "@/components/game/control-panel";
@@ -39,6 +39,7 @@ export function GameApp() {
   function openLearningBackup(event: MouseEvent<HTMLButtonElement>) {
     if (game.backupBlockedReason) return;
     game.cancelLearningRestore();game.closeGlossary();game.closePractice();
+    game.setSgfOverlayOpen("backup", true);
     setBackupOpener(event.currentTarget);
   }
   function openFeedback(event: MouseEvent<HTMLButtonElement>) {
@@ -48,8 +49,17 @@ export function GameApp() {
       context.lessonTitle = game.learningSession.unit.title;
       context.actionKind = game.learningSession.session.exercise?.expected.kind;
     }
+    game.setSgfOverlayOpen("feedback", true);
     setFeedback({ context: createFeedbackReport(context, "operation", "").context, opener: event.currentTarget });
   }
+
+  const setSgfOverlayOpen = game.setSgfOverlayOpen;
+  useEffect(() => () => {
+    setSgfOverlayOpen("backup", false);
+    setSgfOverlayOpen("feedback", false);
+  }, [setSgfOverlayOpen]);
+  function closeFeedback() { game.setSgfOverlayOpen("feedback", false); setFeedback(null); }
+  function closeLearningBackup() { game.setSgfOverlayOpen("backup", false); setBackupOpener(null); }
 
   const isLesson = game.mode === "lesson";
   const boardTitle = game.reviewing ? "逐手复盘 · 第 "+game.reviewIndex+" 手" : isLesson
@@ -122,7 +132,7 @@ export function GameApp() {
         <aside className="game-sidebar" aria-label="棋局控制">
           {!isLesson && game.storageUnavailable ? <p role="status">无法保存进度：浏览器存储不可用，刷新后可能丢失本次位置。</p> : null}
           {!isLesson && !game.reviewing && game.matchState.past.length ? <button type="button" className="dictionary-button review-entry" data-action="start-review" disabled={game.aiThinking} onClick={game.startReview}>逐手复盘</button> : null}
-          {game.reviewing && game.reviewStep ? <ReviewPanel index={game.reviewIndex} total={game.reviewTotal} step={game.reviewStep} moments={game.reviewMoments} progress={game.learningProgress} onSeek={game.seekReview} onExit={game.endReview} onStartLesson={id=>{game.startUnit(id);}} onOpenTerm={game.openTerm}/> : null}
+          {game.reviewing && game.reviewStep ? <ReviewPanel index={game.reviewIndex} total={game.reviewTotal} step={game.reviewStep} moments={game.reviewMoments} progress={game.learningProgress} onSeek={game.seekReview} onExit={game.endReview} onStartLesson={id=>{game.startUnit(id);}} onOpenTerm={game.openTerm} onExport={game.exportSgf} sgfBlockedReason={game.sgfBlockedReason} sgfContext={game.sgfContext}/> : null}
           {isLesson && game.moveExplanation ? <p className="panel move-explanation" role="status" aria-live="polite">{game.moveExplanation}</p> : null}
           <CoachPanel turns={game.coachRound} onOpenTerm={game.openTerm}/>
           {isLesson ? <>
@@ -153,9 +163,12 @@ export function GameApp() {
         onNewGame={game.newGame}
         onReview={game.startReview}
         onFeedback={openFeedback}
+        onExport={game.exportSgf}
+        sgfBlockedReason={game.sgfBlockedReason}
+        sgfContext={game.sgfContext}
       />
-      {feedback ? <FeedbackDialog context={feedback.context} opener={feedback.opener} onClose={() => setFeedback(null)} /> : null}
-      {backupOpener ? <LearningBackupDialog game={game} opener={backupOpener} onClose={()=>setBackupOpener(null)}/> : null}
+      {feedback ? <FeedbackDialog context={feedback.context} opener={feedback.opener} onClose={closeFeedback} /> : null}
+      {backupOpener ? <LearningBackupDialog game={game} opener={backupOpener} onClose={closeLearningBackup}/> : null}
       <PracticeDialog open={game.practiceOpen} progress={game.learningProgress} onClose={game.closePractice}/>
       <Toaster position="top-center" />
       <GlossaryDialog open={game.glossaryOpen} termId={game.glossaryTermId} progress={game.learningProgress}

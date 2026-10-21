@@ -66,7 +66,7 @@ describe("learning backup dialog",()=>{
 
 describe("footer learning backup entry",()=>{
   function app(){host.cursor=host.refCursor=host.effectCursor=0;return GameApp();}
-  function setup(){const session=createLearningSession("s1-intersections-turns"),state=createGame({size:5});host.game={...props.game,mode:"lesson",state,matchState:state,learningProgress:createDefaultProgress(),learningSession:{unit:CURRICULUM_BY_ID.get(session.unitId),session,visibleHints:[]},deadStones:new Set(),coachRound:[],scorePhase:"dead-stones",reviewing:false,closeGlossary:vi.fn(),closePractice:vi.fn()};}
+  function setup(){const session=createLearningSession("s1-intersections-turns"),state=createGame({size:5});host.game={...props.game,mode:"lesson",state,matchState:state,learningProgress:createDefaultProgress(),learningSession:{unit:CURRICULUM_BY_ID.get(session.unitId),session,visibleHints:[]},deadStones:new Set(),coachRound:[],scorePhase:"dead-stones",reviewing:false,setSgfOverlayOpen:vi.fn(),closeGlossary:vi.fn(),closePractice:vi.fn()};}
   it("captures opener, closes auxiliaries and opens a fresh local dialog",()=>{
     setup();const entry=find(app(),"data-action","open-learning-backup");expect(entry).toBeDefined();const opener=props.opener;
     (entry.props.onClick as (event:unknown)=>void)({currentTarget:opener});const opened=nodes(app()).find(e=>e.type===LearningBackupDialog)!;expect(opened.props.opener).toBe(opener);expect(opened.props.game).toBe(host.game);expect(host.game.closeGlossary).toHaveBeenCalledOnce();expect(host.game.closePractice).toHaveBeenCalledOnce();

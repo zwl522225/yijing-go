@@ -1,3 +1,5 @@
+import { SgfExportButton } from "@/components/game/sgf-export-button";
+import type { SgfExportResult } from "@/lib/go/sgf";
 import { useMemo, type MouseEventHandler } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,9 @@ import type { ScorePhase } from "@/lib/go/storage";
 import { cn } from "@/lib/utils";
 
 type ResultDialogProps = {
+  onExport?(): SgfExportResult;
+  sgfBlockedReason?: string | null;
+  sgfContext?: string;
   open: boolean;
   state: GameState;
   deadStones: Set<string>;
@@ -44,6 +49,9 @@ export function ResultDialog({
   onReturnAcademy,
   onReview,
   onFeedback,
+  onExport,
+  sgfBlockedReason = null,
+  sgfContext = "result",
 }: ResultDialogProps) {
   const score = useMemo(
     () => scoreArea(state.board, deadStones, 7.5),
@@ -125,6 +133,8 @@ export function ResultDialog({
         {graduationStatus ? <p role="status" className={graduated ? "graduation-status" : undefined}>{graduationStatus}</p> : null}
 
         {onFeedback ? <button type="button" className="dictionary-button feedback-entry" data-action="open-feedback" onClick={onFeedback}>遇到困难？反馈一下</button> : null}
+
+        {phase === "final" && onExport ? <SgfExportButton onExport={onExport} blockedReason={sgfBlockedReason} context={sgfContext}/> : null}
 
         <DialogFooter>
           {phase === "dead-stones" && !outcome ? <Button data-action="confirm-dead" onClick={onConfirmDead}>确认死子</Button> : null}

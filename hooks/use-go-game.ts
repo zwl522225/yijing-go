@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { chooseMove, type Difficulty } from "@/lib/go/ai";
 import aiWorkerUrl from "../lib/go/ai.worker.ts?worker&url";
 import type { SoundscapeCategory } from "@/lib/audio/soundscapes";
+import { createSgf, type SgfEnding, type SgfExportResult } from "@/lib/go/sgf";
 import { createGame, passTurn, playMove, undoRound } from "@/lib/go/rules";
 import { groupAt } from "@/lib/go/analysis";
 import { getCoachRound } from "@/lib/go/coach";
@@ -37,6 +38,19 @@ function learningBackupBlockedReason(hydrated: boolean, reviewing: boolean, prev
   if (mode === "scoring") return "请完成终局确认并返回新手学堂。";
   if (mode === "lesson" && quizActive) return "请先完成当前测验。";
   if (mode === "play" && computerTurn) return "请等待电脑回合结束。";
+  return null;
+}
+
+function sgfBlockedReason(hydrated: boolean, mode: GameMode, auxiliaryOpen: boolean, previewing: boolean,
+  source: GameState, reviewing: boolean, phase: ScorePhase, outcome: string | null, busy: boolean): string | null {
+  if (!hydrated) return "正在读取对局记录，请稍候。";
+  if (mode === "lesson") return "请先返回人机对局再导出棋谱。";
+  if (auxiliaryOpen) return "请先关闭当前窗口再导出棋谱。";
+  if (previewing) return "请先确认或取消待落子。";
+  if (![9, 13, 19].includes(source.size)) return "仅支持导出 9、13、19 路人机对局。";
+  if (!reviewing && mode === "scoring" && phase !== "final") return "请先完成终局确认，或进入逐手复盘导出记录。";
+  if (busy || (!reviewing && mode === "play" && source.toPlay !== "black")) return "请等待电脑回合结束再导出。";
+  if (!source.moves.length && !(mode === "scoring" && phase === "final" && outcome === "你已认输，白方获胜")) return "先下一手再导出棋谱。";
   return null;
 }
 
@@ -115,7 +129,20 @@ export function useGoGame(audio: AudioPreferences) {
   const [review, setReview] = useState<Review|null>(null);
   const reviewRef = useRef<Review|null>(null);
   const clearReview = useCallback(() => {reviewRef.current=null;setReview(null);},[]);
-  const [practiceOpen, setPracticeOpen] = useState(false);
+  const [practiceOpen, setPracticeOpenState] = useState(false);
+  const practiceOpenRef = useRef(false);
+  const setPracticeOpen = useCallback((open: boolean) => {
+    practiceOpenRef.current = open;
+    setPracticeOpenState(open);
+  }, []);
+  const [sgfOverlays, setSgfOverlays] = useState<ReadonlySet<"backup" | "feedback">>(() => new Set());
+  const sgfOverlaysRef = useRef(sgfOverlays);
+  const setSgfOverlayOpen = useCallback((name: "backup" | "feedback", open: boolean) => {
+    const next = new Set(sgfOverlaysRef.current);
+    if (open) next.add(name); else next.delete(name);
+    sgfOverlaysRef.current = next;
+    setSgfOverlays(next);
+  }, []);
   const [mode, setModeState] = useState<GameMode>("lesson");
   const [moveExplanation,setMoveExplanation] = useState("");
   const speechActiveRef = useRef(false);
@@ -128,7 +155,7 @@ export function useGoGame(audio: AudioPreferences) {
   const setMode=useCallback((next:GameMode)=>{
     if(modeRef.current!==next) {clearPreview();clearReview();setPracticeOpen(false);setMoveExplanation("");cancelExplanationSpeech();}
     modeRef.current=next;setModeState(next);
-  },[cancelExplanationSpeech,clearPreview,clearReview]);
+  },[cancelExplanationSpeech,clearPreview,clearReview,setPracticeOpen]);
   const [matchState, setMatchStateState] = useState<GameState>(() => createGame());
   const matchStateRef = useRef(matchState);
   const setMatchState = useCallback((value: GameState | ((current: GameState) => GameState)) => {
@@ -175,7 +202,12 @@ export function useGoGame(audio: AudioPreferences) {
       recordExplanation(text,quiz);
     },
   });
-  const [glossary, setGlossary] = useState<{open:boolean;termId:TermId|null}>({open:false,termId:null});
+  const [glossary, setGlossaryState] = useState<{open:boolean;termId:TermId|null}>({open:false,termId:null});
+  const glossaryRef = useRef(glossary);
+  const setGlossary = useCallback((next: {open:boolean;termId:TermId|null}) => {
+    glossaryRef.current = next;
+    setGlossaryState(next);
+  }, []);
   const autoOpenedUnits = useRef(new Set<LessonUnitId>());
   const [deadStones, setDeadStonesState] = useState<Set<string>>(() => new Set());
   const deadStonesRef = useRef(deadStones);
@@ -206,9 +238,35 @@ export function useGoGame(audio: AudioPreferences) {
   const hydratedRef = useRef(false);
   const workerRef = useRef<Worker | null>(null);
   const generationRef = useRef(0);
+  // A rendered token clears download status without reading mutable refs during render.
+  const [sgfGeneration, setSgfGeneration] = useState(0);
+  const advanceGeneration = useCallback(() => {
+    generationRef.current += 1;
+    setSgfGeneration(value => value + 1);
+  }, []);
   const busyRef = useRef(false);
   // A callback belongs to the match/lesson context in which it was rendered.
   const actionGeneration = generationRef.current;
+
+  const getSgfBlockedReason = (): string | null => {
+    if (!hydratedRef.current) return "正在读取对局记录，请稍候。";
+    if (actionGeneration !== generationRef.current || mode !== modeRef.current || !!review !== !!reviewRef.current) return "对局状态已变化，请重新点击导出。";
+    return sgfBlockedReason(hydratedRef.current, modeRef.current,
+      practiceOpenRef.current || glossaryRef.current.open || sgfOverlaysRef.current.size > 0,
+      !!previewRef.current, reviewRef.current?.source ?? matchStateRef.current, !!reviewRef.current,
+      scorePhaseRef.current, outcomeRef.current, busyRef.current);
+  };
+  const exportSgf = (): SgfExportResult => {
+    const error = getSgfBlockedReason();
+    if (error) return {ok:false,error};
+    const source = reviewRef.current?.source ?? matchStateRef.current;
+    const ending: SgfEnding = scorePhaseRef.current !== "final"
+      ? {kind:"ongoing"}
+      : outcomeRef.current === "你已认输，白方获胜"
+        ? {kind:"resigned",resigned:"black"}
+        : {kind:"scored",deadStones:[...deadStonesRef.current]};
+    return createSgf(source, ending);
+  };
 
   // Every write, including immediate setting changes, uses the same live snapshot.
   const snapshot = (): SaveData => {
@@ -282,7 +340,7 @@ export function useGoGame(audio: AudioPreferences) {
     if (bookmark) learningSession.restoreSession(target);
     else learningSession.startUnit(target.unitId);
     lessonResumeRef.current = bookmark;
-    generationRef.current += 1;
+    advanceGeneration();
     workerRef.current?.terminate();workerRef.current=null;busyRef.current=false;setAiThinking(false);
     clearPreview();clearReview();setPracticeOpen(false);setGlossary({open:false,termId:null});
     setMoveExplanation("");cancelExplanationSpeech();setMode("lesson");
@@ -496,7 +554,7 @@ export function useGoGame(audio: AudioPreferences) {
     clearPreview();
     setMoveExplanation("");
     cancelExplanationSpeech();
-    generationRef.current += 1;
+    advanceGeneration();
     workerRef.current?.terminate();
     workerRef.current = null;
     busyRef.current = false;
@@ -504,14 +562,14 @@ export function useGoGame(audio: AudioPreferences) {
     setMode("play");
     setOutcome(null);
     setMatchState((current) => undoRound(current));
-  }, [actionGeneration,setMode,cancelExplanationSpeech,setMatchState,setOutcome,clearPreview]);
+  }, [actionGeneration,setMode,cancelExplanationSpeech,setMatchState,setOutcome,clearPreview,advanceGeneration]);
 
   const resetMatch = useCallback((size: BoardSize) => {
     if (actionGeneration !== generationRef.current) return;
     clearPreview();clearReview();setPracticeOpen(false);
     setMoveExplanation("");
     cancelExplanationSpeech();
-    generationRef.current += 1;
+    advanceGeneration();
     workerRef.current?.terminate();
     workerRef.current = null;
     busyRef.current = false;
@@ -522,7 +580,7 @@ export function useGoGame(audio: AudioPreferences) {
     setScorePhase("dead-stones");
     graduationEligibleRef.current = false;
     setMode("play");
-  }, [actionGeneration,setMode,cancelExplanationSpeech,setMatchState,setDeadStones,setScorePhase,setOutcome,clearPreview,clearReview]);
+  }, [actionGeneration,setMode,cancelExplanationSpeech,setMatchState,setDeadStones,setScorePhase,setOutcome,clearPreview,clearReview,setPracticeOpen,advanceGeneration]);
 
   const newGame = useCallback(() => {
     resetMatch(matchStateRef.current.size);
@@ -535,7 +593,7 @@ export function useGoGame(audio: AudioPreferences) {
   const resign = useCallback(() => {
     if (actionGeneration !== generationRef.current || reviewRef.current || modeRef.current !== "play") return;
     clearPreview();
-    generationRef.current += 1;
+    advanceGeneration();
     workerRef.current?.terminate();
     busyRef.current = false;
     setAiThinking(false);
@@ -543,7 +601,7 @@ export function useGoGame(audio: AudioPreferences) {
     graduationEligibleRef.current = false;
     setScorePhase("final");
     setMode("scoring");
-  }, [actionGeneration,setMode,setScorePhase,setOutcome,clearPreview]);
+  }, [actionGeneration,setMode,setScorePhase,setOutcome,clearPreview,advanceGeneration]);
 
   const startUnit = useCallback((id: LessonUnitId) => {
     if (actionGeneration !== generationRef.current) return false;
@@ -554,13 +612,13 @@ export function useGoGame(audio: AudioPreferences) {
     setMoveExplanation("");
     cancelExplanationSpeech();
     setGlossary({open:false,termId:null});
-    generationRef.current += 1;
+    advanceGeneration();
     workerRef.current?.terminate();
     busyRef.current = false;
     setAiThinking(false);
     setMode("lesson");
     return true;
-  }, [actionGeneration,learningSession, setMode,cancelExplanationSpeech,clearPreview,clearReview]);
+  }, [actionGeneration,learningSession, setMode,cancelExplanationSpeech,clearPreview,clearReview,setPracticeOpen,setGlossary,advanceGeneration]);
 
   const continueLearning = () => {
     const resumed = restoreLessonResume(lessonResumeRef.current,learningProgressRef.current);
@@ -582,7 +640,7 @@ export function useGoGame(audio: AudioPreferences) {
       busyRef.current = true;
       void finishAiTurn(currentMatch, actionGeneration);
     }
-  }, [actionGeneration,finishAiTurn, setMode,cancelExplanationSpeech,clearPreview,clearReview]);
+  }, [actionGeneration,finishAiTurn, setMode,cancelExplanationSpeech,clearPreview,clearReview,setPracticeOpen]);
 
   useEffect(() => {
     // Restored saves can contain the human move made just before an AI reply.
@@ -660,7 +718,7 @@ export function useGoGame(audio: AudioPreferences) {
   };
   const startReview = () => {
     if(actionGeneration !== generationRef.current || modeRef.current === "lesson" || busyRef.current || reviewRef.current || !matchStateRef.current.past.length) return false;
-    clearPreview();setPracticeOpen(false);generationRef.current+=1;
+    clearPreview();setPracticeOpen(false);advanceGeneration();
     setMoveExplanation("");cancelExplanationSpeech();
     const source=matchStateRef.current;
     const next={source,index:source.past.length,analysis:analyzeReview(source)};reviewRef.current=next;setReview(next);return true;
@@ -670,7 +728,7 @@ export function useGoGame(audio: AudioPreferences) {
     const next={...reviewRef.current,index:Math.max(0,Math.min(reviewRef.current.source.past.length,Math.trunc(index)))};
     reviewRef.current=next;setReview(next);
   };
-  const endReview = () => {if(actionGeneration !== generationRef.current || !reviewRef.current) return;generationRef.current+=1;clearReview();};
+  const endReview = () => {if(actionGeneration !== generationRef.current || !reviewRef.current) return;advanceGeneration();clearReview();};
   const previewValid=preview && preview.mode===mode &&
     (preview.session ? preview.session === learningSession.session : preview.state === matchState);
   const failurePoint = learningSession.feedback?.failure?.point;
@@ -678,6 +736,9 @@ export function useGoGame(audio: AudioPreferences) {
     learningSession.session.feedbackExerciseId === learningSession.session.exercise?.id && failurePoint &&
     isPointOnBoard(failurePoint, learningSession.state.size) ? failurePoint : null;
   return {
+    sgfBlockedReason:sgfBlockedReason(hydrated,mode,practiceOpen || glossary.open || sgfOverlays.size > 0,!!preview,
+      review?.source ?? matchState,!!review,scorePhase,outcome,aiThinking),exportSgf,setSgfOverlayOpen,
+    sgfContext:`${sgfGeneration}:${mode}:${!!review}`,
     backupBlockedReason:learningBackupBlockedReason(hydrated,!!review,!!preview,mode,glossaryBlocked,aiThinking || matchState.toPlay !== "black"),
     exportLearningBackup,previewLearningBackup,confirmLearningRestore,cancelLearningRestore,
     firstVisit, attemptedPoint, storageUnavailable,

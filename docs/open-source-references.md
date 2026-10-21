@@ -28,3 +28,14 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 - [围棋练习盘 Weiqi Dojo](https://github.com/wang90/weiqi-dojo/tree/25cdd065bb5e68d891e7ded7cdb9136f9fa03faa)：参考中文练习的完成反馈和重新开始，[MIT](https://github.com/wang90/weiqi-dojo/blob/25cdd065bb5e68d891e7ded7cdb9136f9fa03faa/LICENSE)。本游戏的五题分组、小结口径与需巩固再练是结合自身流程的设计，不声称这些项目均有相同功能。
 
 也查阅了未声明仓库许可证的 [go-coach](https://github.com/geekhuashan/go-coach/tree/53fb51be88b76141ffda29b199c1d06aa59c9060) 和 [Gitee KataGo 镜像](https://gitee.com/amiok926/KataGo)，未复用其代码或数据。未来接入须核对实际原作者版本、内容来源与许可。
+
+## 2026-10-20 至 21 日 SGF 补充核对
+
+整盘棋谱导出依据以下原始资料，自行实现历史校验与 SGF 编码，没有迁入外部应用代码、题库或素材：
+
+- [SGF FF4 规范](https://www.red-bean.com/sgf/sgf4.html)：棋谱树、属性值、字符集和文本转义。本游戏导出 UTF-8 单主线。
+- [围棋坐标与停手](https://www.red-bean.com/sgf/go.html)：坐标先列后行、从左上角开始，空值表示停手。
+- [SGF FF4 属性表](https://www.red-bean.com/sgf/properties.html)：棋盘大小、初始摆子与执子方、贴目、规则名、结果和叉号标记。已确认死子使用标记，保留真实落子后的棋盘，不以删子改写主线。
+- [Sabaki 官方仓库](https://github.com/SabakiHQ/Sabaki)：作为外部 SGF 棋谱编辑器的使用参考；本游戏没有集成 Sabaki，也未增加棋谱导入、变化树或 AI 分析。
+
+导出前由本项目规则引擎验证完整历史；SGF 格式本身不证明落子合法或死活判断正确。文件中的结果来自本游戏最终确认，外部工具重新计分可能采用不同死子处理，不能将棋谱视为赛事裁决证明。

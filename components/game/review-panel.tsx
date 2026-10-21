@@ -1,10 +1,13 @@
+import { SgfExportButton } from "@/components/game/sgf-export-button";
+import type { SgfExportResult } from "@/lib/go/sgf";
 import { CURRICULUM_BY_ID } from "@/lib/learning/curriculum";
 import { GLOSSARY_BY_ID } from "@/lib/learning/glossary";
 import { isUnitUnlocked, type LearningProgress } from "@/lib/learning/progress";
 import type { LessonUnitId, TermId } from "@/lib/learning/types";
 import type { ReviewMoment, ReviewStep } from "@/lib/go/review";
 
-export function ReviewPanel({index,total,step,moments,progress,onSeek,onExit,onStartLesson,onOpenTerm}: {
+export function ReviewPanel({index,total,step,moments,progress,onSeek,onExit,onStartLesson,onOpenTerm,onExport,sgfBlockedReason=null,sgfContext="review"}: {
+  onExport?():SgfExportResult;sgfBlockedReason?:string|null;sgfContext?:string;
   index:number;total:number;step:ReviewStep;moments:ReviewMoment[];progress:LearningProgress;
   onSeek(index:number):void;onExit():void;onStartLesson(id:LessonUnitId):void;onOpenTerm(id:TermId):void;
 }) {
@@ -17,6 +20,7 @@ export function ReviewPanel({index,total,step,moments,progress,onSeek,onExit,onS
       <button type="button" data-review-action="end" disabled={index===total} onClick={()=>onSeek(total)}>最后一手</button>
     </div>
     <button type="button" data-review-action="exit" onClick={onExit}>退出复盘 · 返回棋局</button>
+    {onExport ? <SgfExportButton onExport={onExport} blockedReason={sgfBlockedReason} context={sgfContext} description="导出整盘记录，包含当前查看手之后的已有落子"/> : null}
     <section className="review-current-step" aria-label="这一手发生了什么">
       <h3>这一手发生了什么</h3>
       {step.status === "opening" ? <p>这是本次复盘的起始局面。可以点击下一手开始回看。</p> :

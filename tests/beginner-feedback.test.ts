@@ -10,7 +10,7 @@ import { CURRICULUM_BY_ID } from "@/lib/learning/curriculum";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const host=vi.hoisted(()=>({values:[] as unknown[],cursor:0,game:{} as Record<string,unknown>, actions:[] as ReturnType<typeof vi.fn>[]}));
-vi.mock("react",async original=>({...await original<typeof import("react")>(),useState:(initial:unknown)=>{const values=host.values,i=host.cursor++;if(!(i in values))values[i]=typeof initial==="function"?(initial as ()=>unknown)():initial;return [values[i],(next:unknown)=>{values[i]=typeof next==="function"?(next as (v:unknown)=>unknown)(values[i]):next;}];}}));
+vi.mock("react",async original=>({...await original<typeof import("react")>(),useEffect:()=>{},useState:(initial:unknown)=>{const values=host.values,i=host.cursor++;if(!(i in values))values[i]=typeof initial==="function"?(initial as ()=>unknown)():initial;return [values[i],(next:unknown)=>{values[i]=typeof next==="function"?(next as (v:unknown)=>unknown)(values[i]):next;}];}}));
 vi.mock("@/hooks/use-go-game",()=>({useGoGame:()=>host.game}));
 vi.mock("@/hooks/use-soundscape",()=>({useSoundscape:()=>({volume:.5,category:"pop"})}));
 vi.mock("@/hooks/use-webmcp",()=>({useWebMcp:()=>{}}));
@@ -23,7 +23,7 @@ function render(){host.cursor=0;return GameApp();}
 function find(tree:unknown,key:string,value:unknown){return nodes(tree).find(e=>e.props?.[key]===value)!;}
 beforeEach(()=>{
   host.cursor=0;host.values=[];host.actions=[];const session=createLearningSession("s1-intersections-turns"),state=createGame({size:5});
-  host.game={mode:"lesson",state,matchState:state,learningProgress:createDefaultProgress(),learningSession:{unit:CURRICULUM_BY_ID.get(session.unitId),session,visibleHints:[]},deadStones:new Set(),coachRound:[],scorePhase:"dead-stones",reviewing:false};
+  host.game={mode:"lesson",state,matchState:state,learningProgress:createDefaultProgress(),learningSession:{unit:CURRICULUM_BY_ID.get(session.unitId),session,visibleHints:[]},deadStones:new Set(),coachRound:[],scorePhase:"dead-stones",reviewing:false,setSgfOverlayOpen:vi.fn()};
   for(const key of ["startUnit","startPlay","newGame","confirmDeadStones","confirmFinalScore","toggleDeadStone","startReview","selectPoint","cancelMove","setConfirmMoves","setLearningAssist"]){const action=vi.fn();host.game[key]=action;host.actions.push(action);}
 });
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});

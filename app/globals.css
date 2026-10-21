@@ -581,3 +581,8 @@ button:focus-visible, a:focus-visible {
 
 .lesson-story-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .lesson-story-row .lesson-guide { flex: 0 0 48px; }
+
+.sgf-export { margin-top: 0.8rem; min-width: 0; }
+.sgf-export > button { max-width: 100%; white-space: normal; }
+.sgf-export p { margin: 0.4rem 0 0; color: var(--muted-foreground); font-size: 0.78rem; line-height: 1.6; overflow-wrap: anywhere; }
+.sgf-export [role="status"]:empty { margin: 0; }

@@ -1,3 +1,4 @@
+import { SgfExportButton } from "@/components/game/sgf-export-button";
 import { Flag, RotateCcw, Sparkles, Swords } from "lucide-react";
 
 import {
@@ -111,6 +112,8 @@ export function ControlPanel({ game }: ControlPanelProps) {
         </div>
       </TooltipProvider>
       <p className="pass-explanation">停一手会把回合交给对方。本游戏的入门电脑会跟随停一手，连续两次停一手进入计分；棋盘不必填满。真实对局中，对方也可以继续落子。</p>
+
+      {game.mode === "play" ? <SgfExportButton onExport={game.exportSgf} blockedReason={game.sgfBlockedReason} context={game.sgfContext}/> : null}
 
       <div className="control-secondary">
         <AlertDialog>
