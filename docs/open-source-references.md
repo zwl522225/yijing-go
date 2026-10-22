@@ -45,3 +45,7 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 - [Sabaki 官方仓库](https://github.com/SabakiHQ/Sabaki)：作为外部 SGF 棋谱编辑器的使用参考；本游戏没有集成 Sabaki，也未增加棋谱导入、变化树或 AI 分析。
 
 导出前由本项目规则引擎验证完整历史；SGF 格式本身不证明落子合法或死活判断正确。文件中的结果来自本游戏最终确认，外部工具重新计分可能采用不同死子处理，不能将棋谱视为赛事裁决证明。
+
+## 2026-10-22 计分归属查看参考
+
+[OGS Goban](https://github.com/online-go/goban/tree/af59d4d4fea01b2f7fa285199429483490a83175) 固定版本及其 [README](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/README.md) 与 [LICENSE](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/LICENSE)（Apache-2.0）作为“主动显示分数对应点位”交互组织方式的参考。弈境自行实现计分点位说明；没有迁入其代码、算法、题库或素材，也没有新增依赖。

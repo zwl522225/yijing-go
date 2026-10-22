@@ -17,6 +17,22 @@ export type AreaScore = {
   margin: number;
 };
 
+export type AreaPointKind =
+  | "black-stone"
+  | "white-stone"
+  | "black-territory"
+  | "white-territory"
+  | "neutral";
+export type AreaRegion = { id: number; points: Point[]; borders: Color[]; owner: Color | null };
+export type AreaPoint = { kind: AreaPointKind; regionId: number | null };
+export type AreaAnalysis = {
+  board: Board;
+  removed: { point: Point; color: Color }[];
+  points: AreaPoint[][];
+  regions: AreaRegion[];
+  score: AreaScore;
+};
+
 const DIRECTIONS = [
   [1, 0],
   [-1, 0],
@@ -54,13 +70,11 @@ function floodEmpty(board: Board, start: Point, visited: Set<string>) {
   return { points, borders };
 }
 
-export function scoreArea(
-  source: Board,
-  deadStones: Set<string>,
-  komi = 7.5,
-): AreaScore {
+// Shared preparation also lets the read-only validator check original dead-stone facts.
+export function prepareAreaBoard(source: Board, deadStones: Set<string>) {
   const board = source.map((row) => [...row]);
   const dead: Record<Color, number> = { black: 0, white: 0 };
+  const removed: AreaAnalysis["removed"] = [];
 
   for (const key of deadStones) {
     const [x, y] = key.split(",").map(Number);
@@ -68,7 +82,23 @@ export function scoreArea(
     if (!color) continue;
     dead[color] += 1;
     board[y][x] = null;
+    removed.push({ point: { x, y }, color });
   }
+
+  return { board, dead, removed };
+}
+
+export function analyzeArea(
+  source: Board,
+  deadStones: Set<string>,
+  komi = 7.5,
+): AreaAnalysis {
+  const { board, dead, removed } = prepareAreaBoard(source, deadStones);
+  const points: AreaPoint[][] = board.map((row) => row.map((value) => ({
+    kind: value ? `${value}-stone` : "neutral",
+    regionId: null,
+  })));
+  const regions: AreaRegion[] = [];
 
   const stones: Record<Color, number> = { black: 0, white: 0 };
   const territory: Record<Color, number> = { black: 0, white: 0 };
@@ -83,8 +113,13 @@ export function scoreArea(
     for (let x = 0; x < source.length; x += 1) {
       if (board[y][x] !== null || visited.has(`${x},${y}`)) continue;
       const region = floodEmpty(board, { x, y }, visited);
-      if (region.borders.size === 1) {
-        const owner = [...region.borders][0];
+      const owner = region.borders.size === 1 ? [...region.borders][0] : null;
+      const id = regions.length;
+      regions.push({ id, points: region.points, borders: [...region.borders], owner });
+      for (const point of region.points) {
+        points[point.y][point.x] = { kind: owner ? `${owner}-territory` : "neutral", regionId: id };
+      }
+      if (owner) {
         territory[owner] += region.points.length;
       } else {
         neutral += region.points.length;
@@ -98,7 +133,7 @@ export function scoreArea(
   const whiteTotal = whiteArea + komi;
   const winner: Color = blackTotal > whiteTotal ? "black" : "white";
 
-  return {
+  const score: AreaScore = {
     black: {
       stones: stones.black,
       territory: territory.black,
@@ -117,4 +152,10 @@ export function scoreArea(
     winner,
     margin: Math.abs(blackTotal - whiteTotal),
   };
+
+  return { board, removed, points, regions, score };
+}
+
+export function scoreArea(source: Board, deadStones: Set<string>, komi = 7.5): AreaScore {
+  return analyzeArea(source, deadStones, komi).score;
 }

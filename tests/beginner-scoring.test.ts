@@ -39,7 +39,7 @@ describe("beginner scoring guide",()=>{
     const confirm=all.find(e=>e.props["data-action"]==="confirm-dead")!;(confirm.props.onClick as ()=>void)();expect(base.onConfirmDead).toHaveBeenCalledOnce();
     const stone=all.find(e=>e.props["aria-label"]==="1列1行，黑棋")!;(stone.props.onClick as ()=>void)();expect(base.onToggleDead).toHaveBeenCalledWith({x:0,y:0});
     expect(stone.props.disabled).toBe(false);
-    const review=nodes(ResultDialog({...base,phase:"score-review"}));expect(review.find(e=>e.props["aria-label"]==="1列1行，黑棋")!.props.disabled).toBe(true);
+    const review=nodes(ResultDialog({...base,phase:"score-review"}));const reviewHtml=renderToStaticMarkup(createElement(ResultDialog,{...base,phase:"score-review"}));expect(reviewHtml.match(/<button[^>]*aria-label="1列1行，黑棋"[^>]*>/)?.[0]).toContain('disabled=""');
     (review.find(e=>e.props["data-action"]==="confirm-score")!.props.onClick as ()=>void)();expect(base.onConfirmScore).toHaveBeenCalledOnce();
     (all.find(e=>e.props["data-action"]==="open-feedback")!.props.onClick as ()=>void)();expect(base.onFeedback).toHaveBeenCalledOnce();
   });

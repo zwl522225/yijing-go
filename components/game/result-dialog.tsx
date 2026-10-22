@@ -1,4 +1,5 @@
 import { SgfExportButton } from "@/components/game/sgf-export-button";
+import { ScoreOwnershipBoard } from "@/components/game/score-ownership-board";
 import type { SgfExportResult } from "@/lib/go/sgf";
 import { useMemo, type MouseEventHandler } from "react";
 
@@ -92,7 +93,12 @@ export function ResultDialog({
               <li data-step="score-review" aria-current={phase === "score-review" ? "step" : undefined}>2. 核对计分</li>
               <li data-step="final" aria-current={phase === "final" ? "step" : undefined}>3. 完成</li>
             </ol>
-            <div
+          </>
+        ) : null}
+        <ScoreOwnershipBoard state={state} deadStones={deadStones} open={open} phase={phase} outcome={outcome} />
+        {!outcome ? (
+          <>
+            {phase === "dead-stones" ? <div
               className="score-board"
               role="grid"
               aria-label={`${state.size}路终局死子确认棋盘`}
@@ -117,7 +123,7 @@ export function ResultDialog({
                   </button>
                 );
               }))}
-            </div>
+            </div> : null}
             <div className="score-summary">
               <div><span className="score-dot black" /><strong>黑 {score.black.total}</strong><small>子 {score.black.stones} · 地 {score.black.territory}</small></div>
               <div><span className="score-dot white" /><strong>白 {score.white.total}</strong><small>子 {score.white.stones} · 地 {score.white.territory} · 贴 {score.komi}</small></div>
