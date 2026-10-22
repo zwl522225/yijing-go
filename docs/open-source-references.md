@@ -49,3 +49,10 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 ## 2026-10-22 计分归属查看参考
 
 [OGS Goban](https://github.com/online-go/goban/tree/af59d4d4fea01b2f7fa285199429483490a83175) 固定版本及其 [README](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/README.md) 与 [LICENSE](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/LICENSE)（Apache-2.0）作为“主动显示分数对应点位”交互组织方式的参考。弈境自行实现计分点位说明；没有迁入其代码、算法、题库或素材，也没有新增依赖。
+
+## 2026-10-22 复盘点选查气参考
+
+- [OGS Goban 固定版本 BoardState.ts](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/src/engine/BoardState.ts) 与 [LICENSE](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/LICENSE)：Apache-2.0。本项目只参考棋串与去重气点的对应关系，没有复制代码、算法、题库或素材，也没有新增依赖。
+- [英国围棋协会 Playing Go](https://www.britgo.org/files/pubs/playgo.pdf)：仅参考基础气与横竖连通概念，不以其内容作为中国面积计分规则依据，也不复用图例或题目。
+
+本功能的解释来自本项目对当前复盘帧的规则验证与棋块分析，不把参考资料当作自动判死或最佳着法的依据。

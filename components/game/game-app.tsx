@@ -5,6 +5,7 @@ import { FeedbackDialog } from "@/components/game/feedback-dialog";
 import { createFeedbackReport, type FeedbackContext } from "@/lib/learning/feedback-report";
 import { ControlPanel } from "@/components/game/control-panel";
 import { GoBoard } from "@/components/game/go-board";
+import { ReviewGroupInspector } from "@/components/game/review-group-inspector";
 import { InkScene } from "@/components/game/ink-scene";
 import { MusicPlayer } from "@/components/game/music-player";
 import { ResultDialog } from "@/components/game/result-dialog";
@@ -101,7 +102,17 @@ export function GameApp() {
         <BeginnerGuide firstVisit={game.firstVisit && isLesson} quizActive={game.glossaryBlocked} showContinueLearning={!isLesson}
           onContinueLearning={game.continueLearning}/>
         {isLesson ? <LessonTask learning={game.learningSession} graduated={isGraduated(game.learningProgress)} onStartGraduation={()=>game.startNewGame(9)}/> : null}
-        <GoBoard
+        {game.reviewing ? <ReviewGroupInspector
+          state={game.state}
+          source={game.matchState}
+          index={game.reviewIndex}
+          step={game.reviewStep ?? { status: "unavailable" }}
+          assists={game.learningProgress.assists}
+          mode={game.mode}
+          title={boardTitle}
+          eyebrow="人机对局 · 中国规则"
+          prompt={boardPrompt}
+        /> : <GoBoard
           key={`${game.state.size}-${isLesson ? game.learningSession.session.unitId : "match"}`}
           state={game.state}
           assists={game.learningProgress.assists}
@@ -111,15 +122,14 @@ export function GameApp() {
           eyebrow={isLesson ? "新手学堂 · 动手练习" : "人机对局 · 中国规则"}
           prompt={boardPrompt}
           hints={isLesson ? game.learningSession.visibleHints.flatMap(hint => hint.points ?? []) : []}
-          deadStones={isLesson || game.reviewing ? new Set() : game.deadStones}
-          readOnly={game.reviewing}
+          deadStones={isLesson ? new Set() : game.deadStones}
           previewPoint={game.previewPoint}
           attemptedPoint={game.attemptedPoint}
           selectedPoints={isLesson && game.learningSession.selectedDeadStone ? [game.learningSession.selectedDeadStone] : []}
           aiThinking={!isLesson && game.aiThinking}
           onPlay={(point) => { void game.selectPoint(point); }}
           onToggleDead={game.toggleDeadStone}
-        />
+        />}
 
         <section className="board-settings" aria-label="棋盘操作设置">
           <section className="panel move-confirm-panel" aria-label="落子操作设置">

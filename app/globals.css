@@ -164,6 +164,7 @@ button:focus-visible, a:focus-visible {
   color: var(--wood-line); overflow: visible;
 }
 .go-points { position: absolute; inset: calc(50% / var(--board-intervals)); display: grid; grid-template-columns: repeat(var(--board-size), 1fr); grid-template-rows: repeat(var(--board-size), 1fr); }
+.go-inspection-row { display: contents; }
 .go-point {
   position: relative; z-index: 1; display: grid; min-width: 0; padding: 0; place-items: center;
   border: 0; border-radius: 50%; background: transparent; cursor: pointer;
@@ -178,6 +179,8 @@ button:focus-visible, a:focus-visible {
   animation: hint-pulse 2.2s ease-in-out infinite;
 }
 .go-point:hover { background: rgba(189,91,61,.14); }
+.go-point[data-inspected-group] { outline: 2px solid #075349; outline-offset: -1px; }
+.go-point[data-liberty]::after { position: absolute; width: 48%; aspect-ratio: 1; border: 2px solid #075349; border-radius: 50%; background: transparent; content: ""; pointer-events: none; }
 .stone {
   position: relative; z-index: 2; display: block; width: 82%; aspect-ratio: 1; border-radius: 50%;
   box-shadow: 0 3px 5px rgba(55,34,16,.38);
@@ -558,6 +561,16 @@ button:focus-visible, a:focus-visible {
 /* The current task leads to the board; lesson detail stays beside it on desktop. */
 .game-shell { grid-template-areas: "board tabs" "board guide" "board task" "board settings" "board sidebar"; grid-template-rows: repeat(4, auto) 1fr; align-items: start; }
 .game-shell > .board-stage { grid-area: board; }
+.game-shell > .review-group-inspector { grid-area: board; min-width: 0; }
+.review-group-inspector { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.review-inspection-panel { padding: 12px 15px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,250,241,.82); min-width: 0; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.review-inspection-note, .review-inspection-legend { margin: 9px 0; color: var(--muted-ink); }
+.review-inspection-description { margin-top: 10px; }
+.review-inspection-coordinates, .review-liberty-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.review-inspection-coordinates label { display: inline-flex; align-items: center; gap: 5px; }
+.review-inspection-coordinates select { min-height: 36px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fffaf1; }
+.review-liberty-coordinates { display: flex; flex-wrap: wrap; gap: 5px 10px; list-style: none; padding: 0; margin: 10px 0; }
+.review-liberty-pagination [aria-disabled="true"] { opacity: .5; cursor: default; }
 .game-shell > .mode-tabs { grid-area: tabs; }
 .game-shell > .beginner-guide { grid-area: guide; }
 .game-shell > .academy-task { grid-area: task; margin-bottom: 0; }

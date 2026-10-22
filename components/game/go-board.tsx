@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 
 import type { GameMode } from "@/hooks/use-go-game";
 import { centerPoint, starPointKeys } from "@/lib/go/board-geometry";
@@ -23,6 +23,7 @@ type GoBoardProps = {
   previewPoint?: Point|null;
   attemptedPoint?: Point|null;
   readOnly?: boolean;
+  inspection?: { stones: Point[]; liberties: Point[]; onInspect(point: Point): void };
   onPlay(point: Point): void;
   onToggleDead(point: Point): void;
 };
@@ -42,6 +43,7 @@ export function GoBoard({
   previewPoint = null,
   attemptedPoint = null,
   readOnly = false,
+  inspection,
   onPlay,
   onToggleDead,
 }: GoBoardProps) {
@@ -62,6 +64,8 @@ export function GoBoard({
     () => new Set((isQuiz ? [] : hints).map(({ x, y }) => `${x},${y}`)),
     [hints,isQuiz],
   );
+  const inspectedKeys = new Set((readOnly ? inspection?.stones : [])?.map(({ x, y }) => `${x},${y}`));
+  const libertyKeys = new Set((readOnly ? inspection?.liberties : [])?.map(({ x, y }) => `${x},${y}`));
   const boardStyle = {
     "--board-size": size,
     "--board-intervals": size - 1,
@@ -117,7 +121,10 @@ export function GoBoard({
           <path d={Array.from({ length: size }, (_, index) => `M 0 ${index} H ${size - 1} M ${index} 0 V ${size - 1}`).join(" ")} fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         </svg>
         <div className="go-points">
-          {Array.from({ length: size * size }, (_, index) => {
+          {Array.from({ length: readOnly ? size : 1 }, (_, row) => {
+            const Row = readOnly ? "div" : Fragment;
+            return <Row key={row} {...(readOnly ? { role: "row", className: "go-inspection-row" } : {})}>{Array.from({ length: readOnly ? size : size * size }, (_, column) => {
+            const index = readOnly ? row * size + column : column;
             const x = index % size;
             const y = Math.floor(index / size);
             const point = { x, y };
@@ -142,15 +149,17 @@ export function GoBoard({
                 data-selected={selected || undefined}
                 data-preview={candidate || undefined}
                 data-attempted={attempted || undefined}
+                data-inspected-group={inspectedKeys.has(key) || undefined}
+                data-liberty={libertyKeys.has(key) || undefined}
                 key={key}
                 role="gridcell"
-                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${attempted ? "，刚尝试的位置，棋盘未改变" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}`}
+                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${attempted ? "，刚尝试的位置，棋盘未改变" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}${inspectedKeys.has(key) ? "，选中棋块成员" : ""}${libertyKeys.has(key) ? "，本块棋的气" : ""}`}
                 tabIndex={activeFocus.x === x && activeFocus.y === y ? 0 : -1}
                 type="button"
                 onFocus={() => setFocusPoint(point)}
                 onKeyDown={(event) => handleKey(event, point)}
                 onClick={() => {
-                  if (readOnly) return;
+                  if (readOnly) { inspection?.onInspect(point); return; }
                   if (mode === "scoring") onToggleDead(point);
                   else onPlay(point);
                 }}
@@ -165,6 +174,7 @@ export function GoBoard({
                 ) : candidate ? <span className={"stone stone-"+state.toPlay+" stone-preview"} aria-hidden="true"/> : null}
               </button>
             );
+          })}</Row>;
           })}
         </div>
       </div>
