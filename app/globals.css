@@ -502,6 +502,24 @@ button:focus-visible, a:focus-visible {
 .review-moments strong { display: block; font-size: 13px; margin-top: 8px; }
 .review-entry { align-self: start; }
 .practice-dialog .practice-board { max-width: 340px; }
+.tactical-entries { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid #d4c6af; border-radius: 8px; }
+.tactical-entries h3 { color: #314936; font-size: 16px; font-weight: 700; }
+.tactical-entries p, .tactical-practice p, .tactical-practice li { margin: 7px 0; font-size: 14px; line-height: 1.75; }
+.tactical-entries button, .tactical-practice button { max-width: 100%; white-space: normal; }
+.tactical-practice { min-width: 0; margin: 14px 0; }
+.tactical-practice h2 { margin: 12px 0 8px; color: #314936; font-size: 18px; font-weight: 700; line-height: 1.6; }
+.tactical-practice h2:focus { outline: 2px solid #97674b; outline-offset: 3px; }
+.tactical-practice .tactical-scenario-title { font-size: 16px; font-weight: 700; }
+.tactical-status { padding: 8px 12px; border-left: 3px solid #476148; background: #ece7d8; }
+.tactical-feedback.illegal, .tactical-feedback.off-route { color: #8b3327; font-weight: 600; }
+.tactical-practice .tactical-board { width: min(290px,100%); }
+.tactical-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.tactical-practice .tactical-board button:disabled { opacity: 1; }
+.tactical-facts, .tactical-record { padding: 8px 0; border-bottom: 1px solid #d4c6af; }
+.tactical-record h3 { font-size: 15px; font-weight: 700; }
+.tactical-practice ol { padding-left: 24px; }
+.tactical-terms details { margin: 8px 0; padding: 7px 10px; border: 1px solid #d4c6af; border-radius: 8px; }
+.tactical-terms summary { min-height: 30px; color: #36513c; font-size: 14px; cursor: pointer; }
 .practice-round { min-width: 0; margin: 14px 0; }
 .practice-round h2 { margin: 10px 0; color: #314936; font-size: 18px; font-weight: 700; line-height: 1.65; }
 .practice-round h2:focus { outline: 2px solid #97674b; outline-offset: 4px; }

@@ -29,6 +29,12 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 
 也查阅了未声明仓库许可证的 [go-coach](https://github.com/geekhuashan/go-coach/tree/53fb51be88b76141ffda29b199c1d06aa59c9060) 和 [Gitee KataGo 镜像](https://gitee.com/amiok926/KataGo)，未复用其代码或数据。未来接入须核对实际原作者版本、内容来源与许可。
 
+## 连续吃子练习参考
+
+连续练习继续参考 [Weiqi Dojo](https://github.com/wang90/weiqi-dojo/tree/25cdd065bb5e68d891e7ded7cdb9136f9fa03faa) 的交互练习与重练组织、[KaTrain](https://github.com/sanderland/katrain/tree/f4981cf905cece90085ce4e3967415d0c16d525f) 的反馈与重试思路，以及 [Ten Thousand Tsumego](https://github.com/sanderland/tsumego/tree/9d2ca58d3188f42a4bb1248d6c2c1ebbaca56ce4) 的分类组织。结合本项目课程，自行实现“黑棋落子—手动查看白棋示范应手—黑棋再落子”的有限路线；不将这些参考视为本游戏具备最强应手、自由求解或引擎分析能力的证明。
+
+枷吃与倒扑题形来自本项目现有 `STAGE_2_SHAPES.net` 和 `STAGE_2_SHAPES.snapback`，逐手使用自有规则引擎核对棋块、气数和提子。枷吃仅提供向右、向下两个示范分支，倒扑仅提供先失一子、再反提三子的示范路线。本轮没有复制外部代码、题库、音乐或美术，也没有新增运行时依赖；第三方许可边界沿用上述固定版本核对记录。
+
 ## 2026-10-20 至 21 日 SGF 补充核对
 
 整盘棋谱导出依据以下原始资料，自行实现历史校验与 SGF 编码，没有迁入外部应用代码、题库或素材：
