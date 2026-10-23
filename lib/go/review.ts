@@ -1,13 +1,14 @@
 import { getCoachTurn, type CoachTurn } from "@/lib/go/coach";
+import { deriveCapturedPoints } from "@/lib/go/review-captures";
 import { passTurn, playMove } from "@/lib/go/rules";
-import type { Color, GameSnapshot, GameState, Move } from "@/lib/go/types";
+import type { Color, GameSnapshot, GameState, Move, Point } from "@/lib/go/types";
 import type { LessonUnitId, TermId } from "@/lib/learning/types";
 
 export type ReviewMoment = {
   frame:number; color:Color; kind:"capture"|"atari"|"pass"|"end"|"placement";
   choice:string; consequence:string; direction:string; unitId:LessonUnitId; termId:TermId;
 };
-export type ReviewStep = { status: "opening" } | { status: "verified"; turn: CoachTurn } | { status: "unavailable" };
+export type ReviewStep = { status: "opening" } | { status: "verified"; turn: CoachTurn; capturedPoints: Point[] | null } | { status: "unavailable" };
 export type ReviewAnalysis = { steps: ReviewStep[]; moments: ReviewMoment[] };
 
 /** Frames borrow immutable snapshots; review never writes into them or the match. */
@@ -72,7 +73,7 @@ export function analyzeReview(match: GameState): ReviewAnalysis {
       steps.push({ status: "unavailable" });
       continue;
     }
-    steps.push({ status: "verified", turn });
+    steps.push({ status: "verified", turn, capturedPoints: deriveCapturedPoints(replay, result.state) });
     moments.push(momentFor(frame, move, turn));
     // Engine snapshots are useful for live undo, but analysis needs only its current state.
     replay = { ...result.state, past: [] };

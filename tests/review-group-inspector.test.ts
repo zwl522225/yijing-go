@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReviewGroupInspector } from "@/components/game/review-group-inspector";
 import { GoBoard } from "@/components/game/go-board";
-import { createGame, passTurn } from "@/lib/go/rules";
+import { createGame, passTurn, playMove } from "@/lib/go/rules";
+import type { ReviewStep } from "@/lib/go/review";
 import { analyzeReview } from "@/lib/go/review";
 import * as liberties from "@/lib/go/review-liberties";
 
@@ -28,6 +29,82 @@ function setup(overrides: Partial<Parameters<typeof ReviewGroupInspector>[0]> = 
   return { draw, change(next: Partial<typeof props>, flush = true) { props = { ...props, ...next }; return draw(flush); }, expand() { click(draw(), "toggle-review-inspection"); return draw(); } };
 }
 const html = (tree: ReactNode) => renderToStaticMarkup(tree);
+
+function captureFixture(size: 9 | 19 = 9) {
+  const before = createGame({ size, stones: [["white", 0, 0], ["black", 1, 0]] });
+  const result = playMove(before, { x: 0, y: 1 });
+  if (!result.ok) throw new Error("capture fixture rejected");
+  const state = result.state;
+  return { state, source: state, index: 1, step: analyzeReview(state).steps[1] };
+}
+function manyCaptures() {
+  const f = captureFixture(19);
+  const points = Array.from({ length: 10 }, (_, i) => ({ x: 10 - i, y: 4 }));
+  return { ...f, step: { ...f.step, capturedPoints: points } as ReviewStep };
+}
+const captureCoordinates = (tree: unknown) => nodes(tree).filter(e => e.props["data-capture-coordinate"]).map(e => e.props["data-capture-coordinate"]);
+
+describe("review capture positions", () => {
+  it("starts collapsed and expands the original board with exact crosses and historical explanation", () => {
+    const f = captureFixture(), original = JSON.stringify(f), h = setup(f); let tree = h.draw();
+    expect(find(tree, "data-action", "toggle-review-captures").props["aria-expanded"]).toBe(false);
+    expect(html(tree)).not.toContain('data-captured-position="true"');
+    click(tree, "toggle-review-captures"); tree = h.draw();
+    expect(nodes(tree).filter(e => e.type === GoBoard)).toHaveLength(1);
+    expect(boardProps(tree).inspection).toBeUndefined(); expect(boardProps(tree).captured).toEqual({ color: "white", points: [{ x: 0, y: 0 }] });
+    expect(html(tree)).toContain("黑棋本手提掉 1 颗白棋"); expect(html(tree)).toContain("当前这里已是空点"); expect(html(tree)).toContain("上一手");
+    expect(captureCoordinates(tree)).toEqual(["0,0"]);
+    const status = find(tree, "className", "review-capture-description"); expect(status.props.role).toBe("status"); expect(status.props["aria-live"]).toBe("polite"); expect(status.props.tabIndex).toBeUndefined();
+    const markup = html(tree); expect(markup.match(/data-captured-position="true"/g)).toHaveLength(1); expect(markup).toContain("本手被提走的白棋原位置"); expect(markup).not.toContain("stone-preview");
+    expect(JSON.stringify(f)).toBe(original);
+  });
+  it.each([null, undefined, [], [{ x: 0, y: 0 }, { x: 0, y: 0 }], [{ x: -1, y: 0 }], [{ x: 9, y: 0 }], [{ x: .5, y: 0 }], [{ x: 1, y: 0 }], [{ x: 0, y: 0 }, null]].map(points => ({ points })))("withholds the whole malformed fact set $points", ({ points }) => {
+    const f = captureFixture(), h = setup({ ...f, step: { ...f.step, capturedPoints: points } as ReviewStep }); const tree = h.draw();
+    expect(html(tree)).toContain("本手提子位置暂不可用"); expect(nodes(tree).some(e => e.props["data-action"] === "toggle-review-captures")).toBe(false); expect(boardProps(tree).captured).toBeUndefined(); expect(captureCoordinates(tree)).toHaveLength(0);
+  });
+  it("does not expose captures for opening, unavailable, ordinary placements or passes", () => {
+    const f = captureFixture(), passed = passTurn(f.state), ordinary = playMove(createGame({ size: 9 }), { x: 4, y: 4 }); if (!ordinary.ok) throw new Error("fixture");
+    for (const step of [{ status: "opening" }, { status: "unavailable" }, analyzeReview(passed).steps[2], analyzeReview(ordinary.state).steps[1]] as ReviewStep[]) {
+      const tree = setup({ ...f, step }).draw(); expect(nodes(tree).some(e => e.props["data-action"] === "toggle-review-captures")).toBe(false); expect(html(tree)).not.toContain("本手提子位置暂不可用"); expect(boardProps(tree).captured).toBeUndefined();
+      host.values = []; host.pending = []; host.effects = [];
+    }
+  });
+  it("rejects invalid actors and derives black historical markers from white captures", () => {
+    const f = captureFixture(); const bad = setup({ ...f, step: { ...f.step, turn: { ...(f.step.status === "verified" ? f.step.turn : {}), actor: "purple" } } as unknown as ReviewStep }).draw();
+    expect(html(bad)).toContain("本手提子位置暂不可用"); host.values = []; host.pending = []; host.effects = [];
+    const before = createGame({ size: 9, toPlay: "white", stones: [["black", 0, 0], ["white", 1, 0]] }), result = playMove(before, { x: 0, y: 1 }); if (!result.ok) throw new Error("fixture");
+    const h = setup({ state: result.state, source: result.state, index: 1, step: analyzeReview(result.state).steps[1] }); click(h.draw(), "toggle-review-captures"); expect(html(h.draw())).toContain("白棋本手提掉 1 颗黑棋"); expect(boardProps(h.draw()).captured?.color).toBe("black");
+  });
+  it("sorts eight coordinates and a tail page while preserving all board markers and stale boundary guards", () => {
+    const f = manyCaptures(), original = JSON.stringify(f.step), h = setup(f); const closed = h.draw(); click(closed, "toggle-review-captures"); click(closed, "toggle-review-captures"); let tree = h.draw();
+    expect(captureCoordinates(tree)).toEqual(["1,4", "2,4", "3,4", "4,4", "5,4", "6,4", "7,4", "8,4"]);
+    expect(find(tree, "data-action", "previous-capture-page").props["aria-disabled"]).toBe(true); expect(find(tree, "data-action", "previous-capture-page").props.disabled).toBeUndefined();
+    click(tree, "previous-capture-page"); const next = find(tree, "data-action", "next-capture-page").props.onClick as () => void; next(); next(); tree = h.draw();
+    expect(captureCoordinates(tree)).toEqual(["9,4", "10,4"]); expect(html(tree).match(/data-captured-position="true"/g)).toHaveLength(10); expect(find(tree, "data-action", "next-capture-page").props["aria-disabled"]).toBe(true);
+    click(tree, "next-capture-page"); expect(captureCoordinates(h.draw())).toHaveLength(2); expect(JSON.stringify(f.step)).toBe(original);
+  });
+  it("mutually excludes liberty selection and resets coordinates, both page types and stale callbacks", () => {
+    const h = setup(manyCaptures()); let tree = h.expand();
+    (find(tree, "aria-label", "列").props.onChange as (e: unknown) => void)({ target: { value: "19" } }); tree = h.draw(); const oldCoordinate = find(tree, "aria-label", "列").props.onChange as (e: unknown) => void; const oldInspect = boardProps(tree).inspection!.onInspect;
+    click(tree, "toggle-review-captures"); tree = h.draw(); expect(boardProps(tree).inspection).toBeUndefined(); expect(boardProps(tree).captured).toBeDefined();
+    click(tree, "next-capture-page"); tree = h.draw(); const oldPage = find(tree, "data-action", "previous-capture-page").props.onClick as () => void, oldToggle = find(tree, "data-action", "toggle-review-captures").props.onClick as () => void;
+    click(tree, "toggle-review-inspection"); tree = h.draw(); oldCoordinate({ target: { value: "18" } }); oldInspect({ x: 1, y: 0 }); oldPage(); oldToggle(); tree = h.draw();
+    expect(boardProps(tree).captured).toBeUndefined(); expect(find(tree, "aria-label", "列").props.value).toBe(1); expect(html(tree)).not.toContain("共1颗");
+    click(tree, "toggle-review-captures"); tree = h.draw(); expect(captureCoordinates(tree)).toHaveLength(8);
+    click(tree, "toggle-review-captures"); tree = h.draw(); expect(boardProps(tree).captured).toBeUndefined(); click(tree, "toggle-review-captures"); expect(captureCoordinates(h.draw())).toHaveLength(8);
+  });
+  it.each(["index", "board", "source", "size", "status", "facts"])("resets captures and rejects old events synchronously on %s and reentry", kind => {
+    const f = manyCaptures(), h = setup(f); click(h.draw(), "toggle-review-captures"); let tree = h.draw(); const oldToggle = find(tree, "data-action", "toggle-review-captures").props.onClick as () => void, oldPage = find(tree, "data-action", "next-capture-page").props.onClick as () => void;
+    const changes = { index: { index: 2 }, board: { state: { ...f.state, board: f.state.board.map(row => [...row]) } }, source: { source: structuredClone(f.source) }, size: { state: createGame({ size: 13 }) }, status: { step: { status: "unavailable" as const } }, facts: { step: { ...f.step, capturedPoints: null } as ReviewStep } };
+    tree = h.change(changes[kind as keyof typeof changes], false); oldToggle(); oldPage(); expect(boardProps(tree).captured).toBeUndefined();
+    tree = h.change(f, false); oldToggle(); oldPage(); expect(boardProps(h.draw()).captured).toBeUndefined(); click(tree, "toggle-review-captures"); oldPage(); expect(captureCoordinates(h.draw())).toHaveLength(8);
+  });
+  it("preserves capture mode for wrapper objects sharing facts and blocks events after unmount", () => {
+    const f = manyCaptures(), h = setup(f); click(h.draw(), "toggle-review-captures"); let tree = h.change({ state: { ...f.state }, step: { ...f.step } }); expect(boardProps(tree).captured).toBeDefined();
+    const oldToggle = find(tree, "data-action", "toggle-review-captures").props.onClick as () => void, oldPage = find(tree, "data-action", "next-capture-page").props.onClick as () => void; host.effects.forEach(fn => fn()); const before = [...host.values]; oldToggle(); oldPage(); expect(host.values).toEqual(before);
+    host.values = []; host.effects = []; tree = h.draw(); expect(boardProps(tree).captured).toBeUndefined();
+  });
+});
 
 describe("review group inspection", () => {
   it("starts collapsed with the single original read-only board and no write capabilities", () => {
@@ -103,6 +180,16 @@ describe("review group inspection", () => {
 
 describe("GoBoard read-only inspection contract", () => {
   const props = () => ({ state, mode: "play" as const, title: "复盘", eyebrow: "复盘", prompt: "只读", hints: [], deadStones: new Set<string>(), aiThinking: false, onPlay: vi.fn(), onToggleDead: vi.fn(), inspection: { stones: [{ x: 1, y: 1 }], liberties: [{ x: 0, y: 1 }], onInspect: vi.fn() } });
+  it.each(["play", "scoring"] as const)("ignores capture marks passed to ordinary %s while retaining writers", mode => {
+    const p = { ...props(), mode, captured: { points: [{ x: 0, y: 0 }], color: "white" as const } }, tree = GoBoard(p);
+    (find(tree, "aria-label", "1列1行，空位").props.onClick as () => void)(); expect(mode === "play" ? p.onPlay : p.onToggleDead).toHaveBeenCalledExactlyOnceWith({ x: 0, y: 0 }); expect(html(tree)).not.toContain("被提走"); expect(html(tree)).not.toContain('data-captured-position="true"');
+  });
+  it("shows independent empty-point capture ARIA and crosses without inspection, writers, or focus changes", () => {
+    const p = { ...props(), state: captureFixture().state, readOnly: true, inspection: undefined, captured: { points: [{ x: 0, y: 0 }], color: "white" as const } }, tree = GoBoard(p);
+    const point = find(tree, "data-captured-position", true); expect(point.props["aria-label"]).toBe("1列1行，空位，本手被提走的白棋原位置"); expect(html(point)).toContain("captured-position-cross"); expect(html(point)).not.toContain('class="stone'); (point.props.onClick as () => void)();
+    for (const key of ["Enter", " "]) (point.props.onKeyDown as (event: unknown) => void)({ key, preventDefault: vi.fn() });
+    expect(p.onPlay).not.toHaveBeenCalled(); expect(p.onToggleDead).not.toHaveBeenCalled(); expect(nodes(tree).filter(e => e.props.tabIndex === 0)).toHaveLength(1); expect(html(tree)).toContain("last-move-dot");
+  });
   it.each(["play", "scoring"] as const)("ignores accidental inspection props for ordinary %s writers and markers", mode => {
     const p = { ...props(), mode }, tree = GoBoard(p); const point = find(tree, "aria-label", "2列2行，黑棋"); (point.props.onClick as () => void)();
     expect(mode === "play" ? p.onPlay : p.onToggleDead).toHaveBeenCalledExactlyOnceWith({ x: 1, y: 1 }); expect(p.inspection.onInspect).not.toHaveBeenCalled(); expect(html(tree)).not.toContain('data-inspected-group="true"'); expect(html(tree)).not.toContain('data-liberty="true"');

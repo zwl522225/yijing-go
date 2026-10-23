@@ -6,7 +6,7 @@ import type { GameMode } from "@/hooks/use-go-game";
 import { centerPoint, starPointKeys } from "@/lib/go/board-geometry";
 import { analyzeGroups } from "@/lib/go/analysis";
 import { DEFAULT_ASSISTS, type LearningAssists } from "@/lib/learning/progress";
-import type { GameState, Point } from "@/lib/go/types";
+import type { Color, GameState, Point } from "@/lib/go/types";
 
 type GoBoardProps = {
   state: GameState;
@@ -24,6 +24,7 @@ type GoBoardProps = {
   attemptedPoint?: Point|null;
   readOnly?: boolean;
   inspection?: { stones: Point[]; liberties: Point[]; onInspect(point: Point): void };
+  captured?: { points: Point[]; color: Color };
   onPlay(point: Point): void;
   onToggleDead(point: Point): void;
 };
@@ -44,6 +45,7 @@ export function GoBoard({
   attemptedPoint = null,
   readOnly = false,
   inspection,
+  captured,
   onPlay,
   onToggleDead,
 }: GoBoardProps) {
@@ -66,6 +68,7 @@ export function GoBoard({
   );
   const inspectedKeys = new Set((readOnly ? inspection?.stones : [])?.map(({ x, y }) => `${x},${y}`));
   const libertyKeys = new Set((readOnly ? inspection?.liberties : [])?.map(({ x, y }) => `${x},${y}`));
+  const capturedKeys = new Set((readOnly ? captured?.points : [])?.map(({ x, y }) => `${x},${y}`));
   const boardStyle = {
     "--board-size": size,
     "--board-intervals": size - 1,
@@ -130,6 +133,7 @@ export function GoBoard({
             const point = { x, y };
             const key = `${x},${y}`;
             const stone = state.board[y][x];
+            const isCapturedPosition = !stone && capturedKeys.has(key);
             const suggested = hintKeys.has(key);
             const isLast = lastPoint?.x === x && lastPoint.y === y;
             const isDead = !isQuiz && deadStones.has(key);
@@ -151,9 +155,10 @@ export function GoBoard({
                 data-attempted={attempted || undefined}
                 data-inspected-group={inspectedKeys.has(key) || undefined}
                 data-liberty={libertyKeys.has(key) || undefined}
+                data-captured-position={isCapturedPosition || undefined}
                 key={key}
                 role="gridcell"
-                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${attempted ? "，刚尝试的位置，棋盘未改变" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}${inspectedKeys.has(key) ? "，选中棋块成员" : ""}${libertyKeys.has(key) ? "，本块棋的气" : ""}`}
+                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${attempted ? "，刚尝试的位置，棋盘未改变" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}${inspectedKeys.has(key) ? "，选中棋块成员" : ""}${libertyKeys.has(key) ? "，本块棋的气" : ""}${isCapturedPosition ? `，本手被提走的${captured?.color === "black" ? "黑棋" : "白棋"}原位置` : ""}`}
                 tabIndex={activeFocus.x === x && activeFocus.y === y ? 0 : -1}
                 type="button"
                 onFocus={() => setFocusPoint(point)}
@@ -164,6 +169,7 @@ export function GoBoard({
                   else onPlay(point);
                 }}
               >
+                {isCapturedPosition ? <span className="captured-position-cross" aria-hidden="true">×</span> : null}
                 {attempted ? <span className="attempted-point" aria-hidden="true">×</span> : null}
                 {stone ? (
                   <span className={`stone stone-${stone}${isDead ? " stone-dead" : ""}${isAtari ? " stone-atari" : ""}`}>

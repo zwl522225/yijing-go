@@ -38,8 +38,8 @@ describe("verified sequential review analysis", () => {
     const analysis = analyzeReview(match);
     expect(analysis.steps).toEqual([
       { status: "opening" },
-      { status: "verified", turn: getCoachTurn(initial, { x: 2, y: 2 }, { ok: true, state: first }) },
-      { status: "verified", turn: getCoachTurn(first, { x: 4, y: 4 }, { ok: true, state: match }) },
+      { status: "verified", turn: getCoachTurn(initial, { x: 2, y: 2 }, { ok: true, state: first }), capturedPoints: [] },
+      { status: "verified", turn: getCoachTurn(first, { x: 4, y: 4 }, { ok: true, state: match }), capturedPoints: [] },
     ]);
     expect(turnAt(match, 1).summary).toContain("4 口气");
     expect(turnAt(match, 2)).toMatchObject({ actor: "white", moveNumber: 2, summary: expect.stringContaining("（5，5）") });

@@ -56,3 +56,7 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 - [英国围棋协会 Playing Go](https://www.britgo.org/files/pubs/playgo.pdf)：仅参考基础气与横竖连通概念，不以其内容作为中国面积计分规则依据，也不复用图例或题目。
 
 本功能的解释来自本项目对当前复盘帧的规则验证与棋块分析，不把参考资料当作自动判死或最佳着法的依据。
+
+## 2026-10-23 复盘本手提子位置参考
+
+- [OGS Goban 固定版本 GobanEngine.ts](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/src/engine/GobanEngine.ts) 与 [LICENSE](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/LICENSE)：Apache-2.0。本项目仅参考走子结果可提供实际提子数量与位置这一接口职责；自行从已验证的前后局面生成复盘事实，没有复制代码、算法、题库或素材，也没有新增依赖。
