@@ -13,6 +13,17 @@ function elements(node:ReactNode):ReactElement<Record<string,unknown>>[]{if(Arra
 function click(tree:ReactNode,key:string,value:unknown){const button=elements(tree).find(e=>e.props[key]===value)!;expect(button).toBeDefined();(button.props.onClick as ()=>void)();}
 beforeEach(()=>{host.values=[];});
 describe("practice sandbox",()=>{
+  it("offers two area counting entries with full prerequisite guards and rejects retained callbacks after progress replacement",()=>{
+    let progress=createDefaultProgress(); const view=()=>PracticePicker({progress,onClose(){}});
+    let tree=render(view); let entry=elements(tree).find(e=>e.props["data-area-entry"]==="balanced");
+    expect(entry).toBeDefined(); expect(entry!.props.disabled).toBe(true);
+    progress={...progress,completedUnitIds:["s3-chinese-area-komi"]}; tree=render(view);
+    expect(elements(tree).find(e=>e.props["data-area-entry"]==="shifted")!.props.disabled).toBe(true);
+    progress={...progress,completedUnitIds:[...LESSON_UNIT_IDS],bestQuizScores:{"stage-1":100,"stage-2":100}}; tree=render(view);
+    entry=elements(tree).find(e=>e.props["data-area-entry"]==="balanced")!; expect(entry.props.disabled).toBe(false);
+    progress=createDefaultProgress(); render(view); (entry.props.onClick as ()=>void)();
+    expect(elements(render(view)).some(e=>e.props["data-area-entry"]==="balanced")).toBe(true);
+  });
   it("keeps a legal wrong attempt off the board and offers recovery without awarding completion in standalone and term practice",()=>{
     const lesson=CURRICULUM.find(unit=>unit.id==="s1-intersections-turns")!;if(lesson.kind!=="lesson")throw new Error("lesson");
     for(const exercise of [lesson.exercises[0],GLOSSARY_BY_ID.get("intersection")!.practice]) {

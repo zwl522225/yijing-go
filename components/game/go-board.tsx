@@ -23,6 +23,8 @@ type GoBoardProps = {
   previewPoint?: Point|null;
   attemptedPoint?: Point|null;
   readOnly?: boolean;
+  readOnlyLabel?: string;
+  practiceMarks?: { points: Point[]; kind: "stones" | "territory" | "neutral" };
   inspection?: { stones: Point[]; liberties: Point[]; onInspect(point: Point): void };
   captured?: { points: Point[]; color: Color };
   onPlay(point: Point): void;
@@ -44,6 +46,8 @@ export function GoBoard({
   previewPoint = null,
   attemptedPoint = null,
   readOnly = false,
+  readOnlyLabel = "只读复盘",
+  practiceMarks,
   inspection,
   captured,
   onPlay,
@@ -69,6 +73,7 @@ export function GoBoard({
   const inspectedKeys = new Set((readOnly ? inspection?.stones : [])?.map(({ x, y }) => `${x},${y}`));
   const libertyKeys = new Set((readOnly ? inspection?.liberties : [])?.map(({ x, y }) => `${x},${y}`));
   const capturedKeys = new Set((readOnly ? captured?.points : [])?.map(({ x, y }) => `${x},${y}`));
+  const practiceKeys = new Set((readOnly ? practiceMarks?.points : [])?.map(({ x, y }) => `${x},${y}`));
   const boardStyle = {
     "--board-size": size,
     "--board-intervals": size - 1,
@@ -92,7 +97,7 @@ export function GoBoard({
     moveFocus(next);
   };
 
-  const turnText = readOnly ? "只读复盘" : mode === "scoring"
+  const turnText = readOnly ? readOnlyLabel : mode === "scoring"
     ? "确认死子"
     : aiThinking
       ? "白方思考中"
@@ -156,9 +161,10 @@ export function GoBoard({
                 data-inspected-group={inspectedKeys.has(key) || undefined}
                 data-liberty={libertyKeys.has(key) || undefined}
                 data-captured-position={isCapturedPosition || undefined}
+                data-area-practice-mark={practiceKeys.has(key) ? practiceMarks?.kind : undefined}
                 key={key}
                 role="gridcell"
-                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${attempted ? "，刚尝试的位置，棋盘未改变" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}${inspectedKeys.has(key) ? "，选中棋块成员" : ""}${libertyKeys.has(key) ? "，本块棋的气" : ""}${isCapturedPosition ? `，本手被提走的${captured?.color === "black" ? "黑棋" : "白棋"}原位置` : ""}`}
+                aria-label={`${x + 1}列${y + 1}行${stone ? `，${stone === "black" ? "黑棋" : "白棋"}${isDead ? "，已标为死子" : ""}` : "，空位"}${suggested ? "，提示落点" : ""}${attempted ? "，刚尝试的位置，棋盘未改变" : ""}${selected || candidate ? "，已选择，等待确认" : ""}${!isQuiz && assists.showLiberties && group ? `，棋块${group.liberties.length}口气` : ""}${!isQuiz && assists.showAtari && group?.liberties.length === 1 ? "，仅剩一口气" : ""}${inspectedKeys.has(key) ? "，选中棋块成员" : ""}${libertyKeys.has(key) ? "，本块棋的气" : ""}${isCapturedPosition ? `，本手被提走的${captured?.color === "black" ? "黑棋" : "白棋"}原位置` : ""}${practiceKeys.has(key) ? `，${practiceMarks?.kind === "stones" ? "活子" : practiceMarks?.kind === "territory" ? "围住空点" : "公空"}练习标记` : ""}`}
                 tabIndex={activeFocus.x === x && activeFocus.y === y ? 0 : -1}
                 type="button"
                 onFocus={() => setFocusPoint(point)}
@@ -171,6 +177,7 @@ export function GoBoard({
               >
                 {isCapturedPosition ? <span className="captured-position-cross" aria-hidden="true">×</span> : null}
                 {attempted ? <span className="attempted-point" aria-hidden="true">×</span> : null}
+                {practiceKeys.has(key) ? <span className={`area-point-mark ${practiceMarks?.kind}`} aria-hidden="true"/> : null}
                 {stone ? (
                   <span className={`stone stone-${stone}${isDead ? " stone-dead" : ""}${isAtari ? " stone-atari" : ""}`}>
                     {isLast ? <i className="last-move-dot" /> : null}

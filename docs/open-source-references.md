@@ -60,3 +60,7 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 ## 2026-10-23 复盘本手提子位置参考
 
 - [OGS Goban 固定版本 GobanEngine.ts](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/src/engine/GobanEngine.ts) 与 [LICENSE](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/LICENSE)：Apache-2.0。本项目仅参考走子结果可提供实际提子数量与位置这一接口职责；自行从已验证的前后局面生成复盘事实，没有复制代码、算法、题库或素材，也没有新增依赖。
+
+## 2026-10-26 三步数子练习参考
+
+[OGS Goban 固定版本 GobanEngine.ts](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/src/engine/GobanEngine.ts) 与同版本 [LICENSE](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/LICENSE)（Apache-2.0）仅作为分项计分事实再汇总这一概念的参考。两道题、答案、逐点归属和校验均由本项目题面及现有规则与计分器提供；没有复制外部代码、算法、题库或素材，也没有新增依赖。

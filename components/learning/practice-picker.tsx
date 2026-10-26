@@ -8,12 +8,14 @@ import type { LearningProgress } from "@/lib/learning/progress";
 import { PracticeRound } from "@/components/learning/practice-round";
 import { createPracticeRound, type PracticeRound as Round } from "@/lib/learning/practice-round";
 import { TacticalPractice } from "@/components/learning/tactical-practice";
+import { AreaCountingPractice } from "@/components/learning/area-counting-practice";
+import { AREA_PRACTICE_SCENARIOS, canStartAreaPractice, type AreaPracticeScenarioId } from "@/lib/learning/area-practice";
 import { TACTICAL_SEQUENCES, canStartTacticalSequence, type TacticalSequence } from "@/lib/learning/tactical-sequences";
 
 type PracticeItem = ReturnType<typeof getPracticeTopics>[number]["items"][number];
 type PickerView = {topic:string; epoch:number} & (
   {kind:"picker"} | {kind:"free";item:PracticeItem} |
-  {kind:"round";round:Round;theme:string} | {kind:"tactical";scenario:TacticalSequence}
+  {kind:"round";round:Round;theme:string} | {kind:"tactical";scenario:TacticalSequence} | {kind:"area";scenarioId:AreaPracticeScenarioId}
 );
 
 export function PracticePicker({progress,onClose,isActive}: {progress:LearningProgress;onClose():void;isActive?():boolean}) {
@@ -21,13 +23,19 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
   const latest = useRef(view);
   const alive = useRef(true);
   const inputs = useRef({progress,isActive});
-  useEffect(() => { inputs.current={progress,isActive}; },[progress,isActive]);
+  // eslint-disable-next-line react-hooks/refs -- entry handlers must synchronously recheck current progress and parent activity.
+  inputs.current={progress,isActive};
   const entryRefs = useRef<Partial<Record<TacticalSequence["id"],HTMLButtonElement|null>>>({});
   const returnEntry = useRef<TacticalSequence["id"]|null>(null);
+  const areaEntryRefs = useRef<Partial<Record<AreaPracticeScenarioId,HTMLButtonElement|null>>>({});
+  const returnAreaEntry = useRef<AreaPracticeScenarioId|null>(null);
   useEffect(() => { alive.current=true; return () => { alive.current=false; }; },[]);
   useEffect(() => {
     if (view.kind === "picker" && returnEntry.current) {
       entryRefs.current[returnEntry.current]?.focus(); returnEntry.current=null;
+    }
+    if (view.kind === "picker" && returnAreaEntry.current) {
+      areaEntryRefs.current[returnAreaEntry.current]?.focus(); returnAreaEntry.current=null;
     }
   },[view]);
   const topics = getPracticeTopics(progress), wrong = getWrongQuestionPractice(progress);
@@ -39,6 +47,7 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
   const back = () => {
     if (!active()) return;
     if (view.kind === "tactical") returnEntry.current=view.scenario.id;
+    if (view.kind === "area") returnAreaEntry.current=view.scenarioId;
     update({kind:"picker",topic:view.topic,epoch:view.epoch+1});
   };
   const chooseTopic = (topic:string) => {
@@ -54,6 +63,14 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
     if (!active() || view.kind !== "picker" || !canStartTacticalSequence(scenario,inputs.current.progress)) return;
     update({kind:"tactical",topic:view.topic,epoch:view.epoch+1,scenario});
   };
+  const enterArea = (scenarioId:AreaPracticeScenarioId) => {
+    if (!active() || view.kind !== "picker" || !canStartAreaPractice(inputs.current.progress)) return;
+    update({kind:"area",topic:view.topic,epoch:view.epoch+1,scenarioId});
+  };
+  if (view.kind === "area") return <div className="practice-picker">
+    <AreaCountingPractice key={view.epoch} scenarioId={view.scenarioId} isActive={active} onBack={back}/>
+    <button type="button" onClick={close}>结束练习</button>
+  </div>;
   if (view.kind === "tactical") return <div className="practice-picker">
     <TacticalPractice key={view.epoch} scenario={view.scenario} isActive={active} onBack={back}/>
     <button type="button" onClick={close}>结束练习</button>
@@ -69,6 +86,11 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
   </div>;
   return <div className="practice-picker">
     <p>练习不计入课程和测验成绩，也不改变术语掌握状态。</p>
+    <section className="area-entries" aria-label="数子练习">
+      <h3>数子练习</h3><p>亲自数出活子、围住空点与公空，再计算白棋贴目后的结果。</p>
+      {AREA_PRACTICE_SCENARIOS.map(scenario=><button key={scenario.id} type="button" ref={node=>{areaEntryRefs.current[scenario.id]=node;}} data-area-entry={scenario.id} disabled={!canStartAreaPractice(progress)} onClick={()=>enterArea(scenario.id)}>{scenario.title}</button>)}
+      {!canStartAreaPractice(progress) ? <p>先完成《中国规则数目与贴目》，并满足前课解锁条件。</p> : null}
+    </section>
     <section className="tactical-entries" aria-label="连续吃子练习">
       <h3>连续吃子练习</h3><p>你下两手黑棋，中间主动查看白棋示范应手。</p>
       {TACTICAL_SEQUENCES.map(scenario => <div key={scenario.id}>

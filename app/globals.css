@@ -525,6 +525,42 @@ button:focus-visible, a:focus-visible {
 .review-entry { align-self: start; }
 .practice-dialog .practice-board { max-width: 340px; }
 .tactical-entries { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid #d4c6af; border-radius: 8px; }
+.area-entries { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid #d4c6af; border-radius: 8px; }
+.area-entries h3, .area-practice h2, .area-summary h3 { color: #314936; font-weight: 700; }
+.area-entries p, .area-practice p { margin: 8px 0; font-size: 14px; line-height: 1.75; }
+.area-practice { min-width: 0; margin: 14px 0; }
+.area-practice h2 { margin: 12px 0; font-size: 19px; }
+.area-practice h2:focus { outline: 2px solid #97674b; outline-offset: 3px; }
+.area-scenario-title { font-weight: 700; }
+.area-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px; align-items: start; }
+.area-board, .area-work { min-width: 0; }
+.area-board .board-stage { padding: 9px; border-radius: 14px; }
+.area-board .board-caption { flex-wrap: wrap; gap: 6px; }
+.area-board .board-caption strong { font-size: 16px; }
+.area-board .board-footer { flex-wrap: wrap; gap: 6px; }
+.area-board .board-footer .lesson-prompt { flex-basis: 100%; order: -1; }
+.area-board .go-board { width: 100%; }
+.glossary-dialog .area-board .go-point { min-height: 0; min-width: 0; padding: 0; border: 0; border-radius: 50%; background-color: transparent; }
+.area-point-mark { position: absolute; z-index: 3; width: 40%; aspect-ratio: 1; border: 2px solid #075349; pointer-events: none; background: #fff8de; }
+.area-point-mark.stones { width: 96%; border-radius: 50%; background: transparent; box-shadow: 0 0 0 1px #fff8de; }
+.area-point-mark.territory { border-radius: 0; }
+.area-point-mark.neutral { width: 34%; transform: rotate(45deg); border-color: #7b251b; }
+.area-mark-legend { padding: 6px 9px; border: 1px solid #ad9878; background: #fff8de; }
+.area-mark-legend span { font-size: 20px; font-weight: 700; }
+.area-practice fieldset { min-width: 0; margin: 0 0 12px; padding: 0; border: 0; }
+.area-practice legend { margin-bottom: 9px; font-size: 14px; font-weight: 600; }
+.area-field { display: grid; gap: 5px; margin: 9px 0; }
+.area-field label { font-size: 14px; font-weight: 600; }
+.area-field input, .area-field select { min-width: 0; width: 100%; min-height: 42px; padding: 8px; border: 1px solid #ad9878; border-radius: 7px; background: #fffaf0; font-size: 16px; }
+.area-field [aria-invalid=true] { border: 2px solid #8b3327; }
+.area-field small { color: #665e52; font-size: 12px; }
+.area-actions, .area-categories { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.area-practice button, .area-entries button { max-width: 100%; white-space: normal; }
+.area-practice form > button { margin: 0 8px 8px 0; }
+.area-help { margin: 10px 0; }
+.area-categories [aria-pressed=true] { border-color: #075349; background: #e6eddf; }
+.area-practice [data-area-feedback], .area-summary { margin: 12px 0; padding: 10px; border-left: 3px solid #476148; background: #ece7d8; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .area-layout { grid-template-columns: minmax(0,1fr); } .area-board { width: min(100%,360px); margin-inline: auto; } }
 .tactical-entries h3 { color: #314936; font-size: 16px; font-weight: 700; }
 .tactical-entries p, .tactical-practice p, .tactical-practice li { margin: 7px 0; font-size: 14px; line-height: 1.75; }
 .tactical-entries button, .tactical-practice button { max-width: 100%; white-space: normal; }
