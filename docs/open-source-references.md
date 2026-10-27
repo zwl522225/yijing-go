@@ -64,3 +64,7 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 ## 2026-10-26 三步数子练习参考
 
 [OGS Goban 固定版本 GobanEngine.ts](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/src/engine/GobanEngine.ts) 与同版本 [LICENSE](https://github.com/online-go/goban/blob/af59d4d4fea01b2f7fa285199429483490a83175/LICENSE)（Apache-2.0）仅作为分项计分事实再汇总这一概念的参考。两道题、答案、逐点归属和校验均由本项目题面及现有规则与计分器提供；没有复制外部代码、算法、题库或素材，也没有新增依赖。
+
+## 2026-10-27 打劫连续练习参考
+
+[Tenuki README 固定版本](https://github.com/aprescott/tenuki/blob/aeedb4cd39d73242e49490aea359118ea5a4df23/README.md)及同一版本 [MIT LICENSE](https://github.com/aprescott/tenuki/blob/aeedb4cd39d73242e49490aea359118ea5a4df23/LICENSE)作为规则引擎与棋盘显示分离、实际拒绝非法落子并给出反馈的参考。Tenuki 提供可配置的劫规则；弈境沿用现有的历史棋形检查，不改为其默认 simple ko。练习路线与规则事实由本项目题目和规则引擎提供，没有迁入外部代码、题目、插图或音频，也没有新增依赖。

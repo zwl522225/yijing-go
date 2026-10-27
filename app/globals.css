@@ -673,3 +673,22 @@ button:focus-visible, a:focus-visible {
 .sgf-export > button { max-width: 100%; white-space: normal; }
 .sgf-export p { margin: 0.4rem 0 0; color: var(--muted-foreground); font-size: 0.78rem; line-height: 1.6; overflow-wrap: anywhere; }
 .sgf-export [role="status"]:empty { margin: 0; }
+
+.ko-practice { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.ko-practice h3:focus { outline: 2px solid var(--ring, #856331); outline-offset: 4px; }
+.ko-layout { display: grid; grid-template-columns: minmax(0, 290px) minmax(0, 1fr); gap: 1rem; margin: 1rem 0; }
+.ko-board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; max-width: 290px; aspect-ratio: 1; padding: 12px; background: #dfb976; border: 2px solid #987243; border-radius: 8px; }
+.ko-board button { position: relative; display: grid; place-items: center; min-width: 0; padding: 0; border: 0; background: transparent; border-radius: 0; }
+.ko-board button::before { content: ""; position: absolute; inset: 0; background: linear-gradient(#755b36,#755b36) center / 1px 100% no-repeat,linear-gradient(#755b36,#755b36) center / 100% 1px no-repeat; }
+.ko-board .mini-stone { position: relative; width: 78%; aspect-ratio: 1; border-radius: 50%; box-shadow: 1px 2px 3px #0005; }
+.ko-board .mini-stone.black { background: radial-gradient(circle at 30% 25%, #555, #111 75%); }
+.ko-board .mini-stone.white { background: radial-gradient(circle at 30% 25%, #fff, #e8e5dc 75%); border: 1px solid #aaa; }
+.ko-board button:focus-visible { outline: 3px solid #163f89; outline-offset: -3px; z-index: 1; }
+.ko-controls { display: flex; flex-wrap: wrap; gap: .6rem; margin: .8rem 0; }
+.ko-controls button, .ko-entries button { white-space: normal; min-height: 44px; max-width: 100%; }
+.ko-observations ol, .ko-hints { padding-left: 1.5rem; }
+.ko-observations li { margin-bottom: .5rem; }
+.ko-terms details { border-top: 1px solid #b6a38966; padding: .5rem 0; }
+.ko-terms summary { cursor: pointer; }
+@media (max-width: 620px) { .ko-layout { grid-template-columns: minmax(0, 1fr); } .ko-board { margin-inline: auto; } }
+.ko-row { display: contents; }

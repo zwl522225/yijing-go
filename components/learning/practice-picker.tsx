@@ -8,13 +8,15 @@ import type { LearningProgress } from "@/lib/learning/progress";
 import { PracticeRound } from "@/components/learning/practice-round";
 import { createPracticeRound, type PracticeRound as Round } from "@/lib/learning/practice-round";
 import { TacticalPractice } from "@/components/learning/tactical-practice";
+import { KoPractice } from "@/components/learning/ko-practice";
+import { canStartKoPractice } from "@/lib/learning/ko-practice";
 import { AreaCountingPractice } from "@/components/learning/area-counting-practice";
 import { AREA_PRACTICE_SCENARIOS, canStartAreaPractice, type AreaPracticeScenarioId } from "@/lib/learning/area-practice";
 import { TACTICAL_SEQUENCES, canStartTacticalSequence, type TacticalSequence } from "@/lib/learning/tactical-sequences";
 
 type PracticeItem = ReturnType<typeof getPracticeTopics>[number]["items"][number];
 type PickerView = {topic:string; epoch:number} & (
-  {kind:"picker"} | {kind:"free";item:PracticeItem} |
+  {kind:"picker"} | {kind:"ko"} | {kind:"free";item:PracticeItem} |
   {kind:"round";round:Round;theme:string} | {kind:"tactical";scenario:TacticalSequence} | {kind:"area";scenarioId:AreaPracticeScenarioId}
 );
 
@@ -26,11 +28,14 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
   // eslint-disable-next-line react-hooks/refs -- entry handlers must synchronously recheck current progress and parent activity.
   inputs.current={progress,isActive};
   const entryRefs = useRef<Partial<Record<TacticalSequence["id"],HTMLButtonElement|null>>>({});
+  const koEntry = useRef<HTMLButtonElement|null>(null);
+  const returnKo = useRef(false);
   const returnEntry = useRef<TacticalSequence["id"]|null>(null);
   const areaEntryRefs = useRef<Partial<Record<AreaPracticeScenarioId,HTMLButtonElement|null>>>({});
   const returnAreaEntry = useRef<AreaPracticeScenarioId|null>(null);
   useEffect(() => { alive.current=true; return () => { alive.current=false; }; },[]);
   useEffect(() => {
+    if (view.kind === "picker" && returnKo.current) { koEntry.current?.focus(); returnKo.current=false; }
     if (view.kind === "picker" && returnEntry.current) {
       entryRefs.current[returnEntry.current]?.focus(); returnEntry.current=null;
     }
@@ -46,6 +51,7 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
   const close = () => { if (!active()) return; alive.current=false; onClose(); };
   const back = () => {
     if (!active()) return;
+    if (view.kind === "ko") returnKo.current=true;
     if (view.kind === "tactical") returnEntry.current=view.scenario.id;
     if (view.kind === "area") returnAreaEntry.current=view.scenarioId;
     update({kind:"picker",topic:view.topic,epoch:view.epoch+1});
@@ -67,6 +73,7 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
     if (!active() || view.kind !== "picker" || !canStartAreaPractice(inputs.current.progress)) return;
     update({kind:"area",topic:view.topic,epoch:view.epoch+1,scenarioId});
   };
+  if (view.kind === "ko") return <div className="practice-picker"><KoPractice key={view.epoch} isActive={active} onBack={back}/><button type="button" onClick={close}>结束练习</button></div>;
   if (view.kind === "area") return <div className="practice-picker">
     <AreaCountingPractice key={view.epoch} scenarioId={view.scenarioId} isActive={active} onBack={back}/>
     <button type="button" onClick={close}>结束练习</button>
@@ -86,6 +93,7 @@ export function PracticePicker({progress,onClose,isActive}: {progress:LearningPr
   </div>;
   return <div className="practice-picker">
     <p>练习不计入课程和测验成绩，也不改变术语掌握状态。</p>
+    <section className="ko-entries" aria-label="劫与劫材练习"><h3>劫与劫材</h3><p>你执白，亲自体验不能立即回提，再查看黑棋的两种应对。</p><button type="button" ref={koEntry} data-ko-entry="ko" disabled={!canStartKoPractice(progress)} onClick={()=>{if(!active() || view.kind!=="picker" || !canStartKoPractice(inputs.current.progress))return;update({kind:"ko",topic:view.topic,epoch:view.epoch+1});}}>劫与劫材：两种应对</button>{!canStartKoPractice(progress)?<p>先完成《劫与劫材》，并满足前课解锁条件。</p>:null}</section>
     <section className="area-entries" aria-label="数子练习">
       <h3>数子练习</h3><p>亲自数出活子、围住空点与公空，再计算白棋贴目后的结果。</p>
       {AREA_PRACTICE_SCENARIOS.map(scenario=><button key={scenario.id} type="button" ref={node=>{areaEntryRefs.current[scenario.id]=node;}} data-area-entry={scenario.id} disabled={!canStartAreaPractice(progress)} onClick={()=>enterArea(scenario.id)}>{scenario.title}</button>)}

@@ -63,3 +63,8 @@ describe("practice sandbox",()=>{
     expect(progress).toEqual(before);
   });
 });
+
+it("offers independently guarded ko practice entry",()=>{
+ let progress=createDefaultProgress();const view=()=>PracticePicker({progress,onClose(){}});let tree=render(view);let entry=elements(tree).find(e=>e.props["data-ko-entry"]==="ko");expect(entry).toBeDefined();expect(entry!.props.disabled).toBe(true);
+ progress={...progress,completedUnitIds:[...LESSON_UNIT_IDS],bestQuizScores:{"stage-1":100,"stage-2":100}};tree=render(view);entry=elements(tree).find(e=>e.props["data-ko-entry"]==="ko")!;expect(entry.props.disabled).toBe(false);progress=createDefaultProgress();render(view);(entry.props.onClick as ()=>void)();expect(elements(render(view)).some(e=>e.props["data-ko-entry"]==="ko")).toBe(true);
+});
