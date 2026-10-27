@@ -68,3 +68,7 @@ KataGo 尚未接入。[分析协议](https://github.com/lightvector/KataGo/blob/
 ## 2026-10-27 打劫连续练习参考
 
 [Tenuki README 固定版本](https://github.com/aprescott/tenuki/blob/aeedb4cd39d73242e49490aea359118ea5a4df23/README.md)及同一版本 [MIT LICENSE](https://github.com/aprescott/tenuki/blob/aeedb4cd39d73242e49490aea359118ea5a4df23/LICENSE)作为规则引擎与棋盘显示分离、实际拒绝非法落子并给出反馈的参考。Tenuki 提供可配置的劫规则；弈境沿用现有的历史棋形检查，不改为其默认 simple ko。练习路线与规则事实由本项目题目和规则引擎提供，没有迁入外部代码、题目、插图或音频，也没有新增依赖。
+
+## 2026-10-27 征子连续练习参考
+
+[KataGo 固定版本 board.h](https://github.com/lightvector/KataGo/blob/d91ea855110dae533f0aada947b2b7d78cc8a4e1/cpp/game/board.h) 与同一版本 [LICENSE](https://github.com/lightvector/KataGo/blob/d91ea855110dae533f0aada947b2b7d78cc8a4e1/LICENSE)：头文件具有专门的可变状态征子搜索接口 `searchIsLadderCaptured`，明确本项目有限路线的规则回放不等于搜索或自由征子求解。练习题沿用本项目 `STAGE_2_SHAPES` 摆子和规则引擎；没有复制外部代码、题目、素材或测试，也没有增加运行时依赖。KataGo 主体许可为 MIT，但头文件所述外部文件和库另有许可边界；不据此声称所有外部资产均受 MIT 覆盖。

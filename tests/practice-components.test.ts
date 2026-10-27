@@ -13,6 +13,11 @@ function elements(node:ReactNode):ReactElement<Record<string,unknown>>[]{if(Arra
 function click(tree:ReactNode,key:string,value:unknown){const button=elements(tree).find(e=>e.props[key]===value)!;expect(button).toBeDefined();(button.props.onClick as ()=>void)();}
 beforeEach(()=>{host.values=[];});
 describe("practice sandbox",()=>{
+  it("presents both ladder entries with approved wording and an explicit prerequisite reason",()=>{
+    const tree=render(()=>PracticePicker({progress:createDefaultProgress(),onClose(){}}));
+    const text=renderToStaticMarkup(tree);expect(text).toContain("征子连续练习");expect(text).toContain("追到边线并提子");expect(text).toContain("接应子改变追法");expect(text).toContain("第一阶段测验");
+    expect(elements(tree).filter(e=>e.props["data-ladder-entry"]!==undefined)).toHaveLength(2);
+  });
   it("offers two area counting entries with full prerequisite guards and rejects retained callbacks after progress replacement",()=>{
     let progress=createDefaultProgress(); const view=()=>PracticePicker({progress,onClose(){}});
     let tree=render(view); let entry=elements(tree).find(e=>e.props["data-area-entry"]==="balanced");
